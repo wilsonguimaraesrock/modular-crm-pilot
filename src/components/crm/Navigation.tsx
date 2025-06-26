@@ -55,9 +55,9 @@ export const Navigation = ({ activeModule, setActiveModule }: NavigationProps) =
           <div className="mb-6">
             <h2 className="text-lg font-semibold text-white mb-2">CRM Inteligente</h2>
             <div className="w-full bg-slate-700 rounded-full h-2">
-              <div className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full w-0"></div>
+              <div className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full w-full"></div>
             </div>
-            <p className="text-xs text-slate-400 mt-1">Iniciando sistema...</p>
+            <p className="text-xs text-slate-400 mt-1">Sistema operacional</p>
           </div>
 
           {modules.map((module, index) => {
@@ -116,7 +116,7 @@ export const Navigation = ({ activeModule, setActiveModule }: NavigationProps) =
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
             <span className="text-xs text-slate-300">Sistema Online</span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">Aguardando dados...</p>
+          <p className="text-xs text-slate-400 mt-1">Pronto para dados reais</p>
         </motion.div>
       </motion.nav>
     </TooltipProvider>

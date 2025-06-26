@@ -5,13 +5,35 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Users, MessageSquare, Calendar, Send, TrendingUp, Plus } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useState, useEffect } from 'react';
 
 export const DashboardOverview = () => {
-  const stats = [
-    { label: 'Leads Capturados', value: '0', icon: Users, color: 'from-blue-500 to-blue-600' },
-    { label: 'Qualificados pela IA', value: '0', icon: MessageSquare, color: 'from-blue-600 to-blue-700' },
-    { label: 'Reuniões Agendadas', value: '0', icon: Calendar, color: 'from-blue-700 to-blue-800' },
-    { label: 'Enviados WhatsApp', value: '0', icon: Send, color: 'from-blue-800 to-blue-900' },
+  const [stats, setStats] = useState({
+    leadsCapturados: 0,
+    qualificadosIA: 0,
+    reunioesAgendadas: 0,
+    enviadosWhatsApp: 0
+  });
+
+  const [pipeline, setPipeline] = useState({
+    novosLeads: 0,
+    qualificados: 0,
+    agendados: 0,
+    fechados: 0
+  });
+
+  const statsDisplay = [
+    { label: 'Leads Capturados', value: stats.leadsCapturados, icon: Users, color: 'from-blue-500 to-blue-600' },
+    { label: 'Qualificados pela IA', value: stats.qualificadosIA, icon: MessageSquare, color: 'from-blue-600 to-blue-700' },
+    { label: 'Reuniões Agendadas', value: stats.reunioesAgendadas, icon: Calendar, color: 'from-blue-700 to-blue-800' },
+    { label: 'Enviados WhatsApp', value: stats.enviadosWhatsApp, icon: Send, color: 'from-blue-800 to-blue-900' },
+  ];
+
+  const pipelineData = [
+    { stage: 'Novos Leads', count: pipeline.novosLeads, color: 'bg-blue-500', progress: pipeline.novosLeads > 0 ? (pipeline.novosLeads / (pipeline.novosLeads + pipeline.qualificados + pipeline.agendados + pipeline.fechados)) * 100 : 0 },
+    { stage: 'Qualificados', count: pipeline.qualificados, color: 'bg-blue-600', progress: pipeline.qualificados > 0 ? (pipeline.qualificados / (pipeline.novosLeads + pipeline.qualificados + pipeline.agendados + pipeline.fechados)) * 100 : 0 },
+    { stage: 'Agendados', count: pipeline.agendados, color: 'bg-blue-700', progress: pipeline.agendados > 0 ? (pipeline.agendados / (pipeline.novosLeads + pipeline.qualificados + pipeline.agendados + pipeline.fechados)) * 100 : 0 },
+    { stage: 'Fechados', count: pipeline.fechados, color: 'bg-blue-800', progress: pipeline.fechados > 0 ? (pipeline.fechados / (pipeline.novosLeads + pipeline.qualificados + pipeline.agendados + pipeline.fechados)) * 100 : 0 },
   ];
 
   const container = {
@@ -38,7 +60,7 @@ export const DashboardOverview = () => {
     >
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, index) => {
+        {statsDisplay.map((stat, index) => {
           const Icon = stat.icon;
           return (
             <motion.div key={index} variants={item}>
@@ -73,27 +95,29 @@ export const DashboardOverview = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              {[
-                { stage: 'Novos Leads', count: 0, color: 'bg-blue-500', progress: 0 },
-                { stage: 'Qualificados', count: 0, color: 'bg-blue-600', progress: 0 },
-                { stage: 'Agendados', count: 0, color: 'bg-blue-700', progress: 0 },
-                { stage: 'Fechados', count: 0, color: 'bg-blue-800', progress: 0 },
-              ].map((stage, index) => (
-                <motion.div 
-                  key={index} 
-                  className="text-center space-y-3"
-                  whileHover={{ scale: 1.05 }}
-                  transition={{ type: "spring", stiffness: 300 }}
-                >
-                  <div className={`w-16 h-16 ${stage.color} rounded-full flex items-center justify-center mx-auto mb-2 shadow-lg hover:shadow-xl transition-shadow duration-300`}>
-                    <span className="text-white font-bold text-lg">{stage.count}</span>
-                  </div>
-                  <p className="text-slate-300 font-medium">{stage.stage}</p>
-                  <Progress value={stage.progress} className="h-2" />
-                </motion.div>
-              ))}
-            </div>
+            {pipeline.novosLeads === 0 && pipeline.qualificados === 0 && pipeline.agendados === 0 && pipeline.fechados === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-slate-400 text-lg mb-4">Nenhum lead ainda</p>
+                <p className="text-slate-500">Comece capturando seus primeiros leads</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                {pipelineData.map((stage, index) => (
+                  <motion.div 
+                    key={index} 
+                    className="text-center space-y-3"
+                    whileHover={{ scale: 1.05 }}
+                    transition={{ type: "spring", stiffness: 300 }}
+                  >
+                    <div className={`w-16 h-16 ${stage.color} rounded-full flex items-center justify-center mx-auto mb-2 shadow-lg hover:shadow-xl transition-shadow duration-300`}>
+                      <span className="text-white font-bold text-lg">{stage.count}</span>
+                    </div>
+                    <p className="text-slate-300 font-medium">{stage.stage}</p>
+                    <Progress value={stage.progress} className="h-2" />
+                  </motion.div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </motion.div>
@@ -102,12 +126,12 @@ export const DashboardOverview = () => {
       <motion.div variants={item}>
         <Card className="bg-slate-800/50 backdrop-blur-sm border-slate-700">
           <CardHeader>
-            <CardTitle className="text-xl font-semibold text-white">Bem-vindo ao CRM Inteligente</CardTitle>
+            <CardTitle className="text-xl font-semibold text-white">Sistema CRM Inteligente</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <p className="text-slate-300">
-                Seu sistema está pronto para começar. Configure as integrações e comece a capturar leads.
+                Configure as integrações e comece a capturar leads reais. O sistema está pronto para processar dados reais.
               </p>
               <div className="flex space-x-3">
                 <Button className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800">

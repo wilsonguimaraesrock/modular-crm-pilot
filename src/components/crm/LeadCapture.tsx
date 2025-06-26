@@ -7,10 +7,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { UserPlus, Globe, Facebook, Instagram, Linkedin, Mail, Phone, MapPin, Building } from 'lucide-react';
 import { useState } from 'react';
 import { motion } from 'framer-motion';
+import { useToast } from '@/hooks/use-toast';
 
 export const LeadCapture = () => {
   const [formData, setFormData] = useState({
@@ -24,24 +24,85 @@ export const LeadCapture = () => {
   });
 
   const [autoQualification, setAutoQualification] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [leads, setLeads] = useState<any[]>([]);
+  const [stats, setStats] = useState({
+    leadsHoje: 0,
+    qualificados: 0,
+    agendados: 0,
+    fechados: 0
+  });
+
+  const { toast } = useToast();
 
   const sources = [
-    { id: 'website', name: 'Website', icon: Globe, count: 45, color: 'bg-blue-500' },
-    { id: 'facebook', name: 'Facebook Ads', icon: Facebook, count: 32, color: 'bg-blue-600' },
-    { id: 'instagram', name: 'Instagram', icon: Instagram, count: 28, color: 'bg-pink-500' },
-    { id: 'linkedin', name: 'LinkedIn', icon: Linkedin, count: 19, color: 'bg-blue-700' },
+    { id: 'website', name: 'Website', icon: Globe, count: 0, color: 'bg-blue-500' },
+    { id: 'facebook', name: 'Facebook Ads', icon: Facebook, count: 0, color: 'bg-blue-600' },
+    { id: 'instagram', name: 'Instagram', icon: Instagram, count: 0, color: 'bg-blue-700' },
+    { id: 'linkedin', name: 'LinkedIn', icon: Linkedin, count: 0, color: 'bg-blue-800' },
   ];
 
-  const recentLeads = [
-    { name: 'Carlos Silva', company: 'Tech Corp', source: 'website', time: '2min', score: 85 },
-    { name: 'Ana Oliveira', company: 'Marketing Plus', source: 'facebook', time: '5min', score: 92 },
-    { name: 'João Santos', company: 'StartupX', source: 'linkedin', time: '8min', score: 78 },
-  ];
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Lógica de envio do formulário
-    console.log('Lead capturado:', formData);
+    
+    if (!formData.name || !formData.email) {
+      toast({
+        title: "Erro",
+        description: "Preencha pelo menos nome e e-mail",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      // Criar novo lead
+      const newLead = {
+        id: Date.now().toString(),
+        ...formData,
+        timestamp: new Date().toISOString(),
+        score: 0,
+        status: 'novo'
+      };
+
+      // Adicionar à lista de leads
+      setLeads(prev => [newLead, ...prev]);
+      
+      // Atualizar estatísticas
+      setStats(prev => ({
+        ...prev,
+        leadsHoje: prev.leadsHoje + 1
+      }));
+
+      // Limpar formulário
+      setFormData({
+        name: '',
+        email: '',
+        phone: '',
+        company: '',
+        position: '',
+        interests: '',
+        source: 'website'
+      });
+
+      toast({
+        title: "Lead Capturado!",
+        description: `Lead ${newLead.name} foi adicionado com sucesso`,
+      });
+
+      console.log('Lead capturado:', newLead);
+
+    } catch (error) {
+      console.error('Erro ao capturar lead:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao capturar lead. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const container = {
@@ -68,14 +129,14 @@ export const LeadCapture = () => {
     >
       <Tabs defaultValue="capture" className="space-y-6">
         <TabsList className="grid w-full grid-cols-3 bg-slate-800/50">
-          <TabsTrigger value="capture" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-purple-600">
+          <TabsTrigger value="capture" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-blue-700">
             Capturar Lead
           </TabsTrigger>
-          <TabsTrigger value="sources" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-purple-600">
+          <TabsTrigger value="sources" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-blue-700">
             Fontes
           </TabsTrigger>
-          <TabsTrigger value="recent" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-purple-600">
-            Recentes
+          <TabsTrigger value="recent" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-blue-700">
+            Leads Recentes
           </TabsTrigger>
         </TabsList>
 
@@ -163,29 +224,13 @@ export const LeadCapture = () => {
                       </Label>
                     </div>
 
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button 
-                          type="submit"
-                          className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 transition-all duration-300"
-                        >
-                          Capturar Lead
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent className="bg-slate-800 border-slate-700">
-                        <AlertDialogHeader>
-                          <AlertDialogTitle className="text-white">Lead Capturado!</AlertDialogTitle>
-                          <AlertDialogDescription className="text-slate-300">
-                            O lead foi capturado com sucesso e será processado pela IA para qualificação automática.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogAction className="bg-green-600 hover:bg-green-700">
-                            OK
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                    <Button 
+                      type="submit"
+                      disabled={isLoading}
+                      className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 transition-all duration-300"
+                    >
+                      {isLoading ? 'Capturando...' : 'Capturar Lead'}
+                    </Button>
                   </form>
                 </CardContent>
               </Card>
@@ -202,34 +247,34 @@ export const LeadCapture = () => {
                       <div className="flex items-center space-x-2">
                         <Mail className="text-blue-400" size={20} />
                         <div>
-                          <p className="text-2xl font-bold text-white">12</p>
+                          <p className="text-2xl font-bold text-white">{stats.leadsHoje}</p>
                           <p className="text-slate-400 text-sm">Leads Hoje</p>
                         </div>
                       </div>
                     </div>
                     <div className="p-4 bg-slate-700/30 rounded-lg">
                       <div className="flex items-center space-x-2">
-                        <Phone className="text-green-400" size={20} />
+                        <Phone className="text-blue-500" size={20} />
                         <div>
-                          <p className="text-2xl font-bold text-white">8</p>
+                          <p className="text-2xl font-bold text-white">{stats.qualificados}</p>
                           <p className="text-slate-400 text-sm">Qualificados</p>
                         </div>
                       </div>
                     </div>
                     <div className="p-4 bg-slate-700/30 rounded-lg">
                       <div className="flex items-center space-x-2">
-                        <MapPin className="text-purple-400" size={20} />
+                        <MapPin className="text-blue-600" size={20} />
                         <div>
-                          <p className="text-2xl font-bold text-white">5</p>
+                          <p className="text-2xl font-bold text-white">{stats.agendados}</p>
                           <p className="text-slate-400 text-sm">Agendados</p>
                         </div>
                       </div>
                     </div>
                     <div className="p-4 bg-slate-700/30 rounded-lg">
                       <div className="flex items-center space-x-2">
-                        <Building className="text-orange-400" size={20} />
+                        <Building className="text-blue-700" size={20} />
                         <div>
-                          <p className="text-2xl font-bold text-white">3</p>
+                          <p className="text-2xl font-bold text-white">{stats.fechados}</p>
                           <p className="text-slate-400 text-sm">Fechados</p>
                         </div>
                       </div>
@@ -273,38 +318,47 @@ export const LeadCapture = () => {
               <CardTitle className="text-white">Leads Recentes</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {recentLeads.map((lead, index) => (
-                  <motion.div 
-                    key={index}
-                    className="flex items-center justify-between p-4 bg-slate-700/30 rounded-lg hover:bg-slate-700/50 transition-all duration-300"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    whileHover={{ x: 4 }}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
-                        <span className="text-white font-semibold">{lead.name[0]}</span>
+              {leads.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-slate-400 text-lg mb-2">Nenhum lead ainda</p>
+                  <p className="text-slate-500">Os leads capturados aparecerão aqui</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {leads.map((lead, index) => (
+                    <motion.div 
+                      key={lead.id}
+                      className="flex items-center justify-between p-4 bg-slate-700/30 rounded-lg hover:bg-slate-700/50 transition-all duration-300"
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      whileHover={{ x: 4 }}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
+                          <span className="text-white font-semibold">{lead.name[0]}</span>
+                        </div>
+                        <div>
+                          <p className="text-white font-medium">{lead.name}</p>
+                          <p className="text-slate-400 text-sm">{lead.company || lead.email}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-white font-medium">{lead.name}</p>
-                        <p className="text-slate-400 text-sm">{lead.company}</p>
+                      <div className="flex items-center space-x-4">
+                        <Badge variant="secondary" className="text-slate-300">
+                          {lead.source}
+                        </Badge>
+                        <div className="text-center">
+                          <p className="text-white font-semibold">{lead.score}</p>
+                          <p className="text-slate-400 text-xs">Score</p>
+                        </div>
+                        <span className="text-slate-400 text-sm">
+                          {new Date(lead.timestamp).toLocaleTimeString()}
+                        </span>
                       </div>
-                    </div>
-                    <div className="flex items-center space-x-4">
-                      <Badge variant="secondary" className="text-slate-300">
-                        {lead.source}
-                      </Badge>
-                      <div className="text-center">
-                        <p className="text-white font-semibold">{lead.score}</p>
-                        <p className="text-slate-400 text-xs">Score</p>
-                      </div>
-                      <span className="text-slate-400 text-sm">{lead.time}</span>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
