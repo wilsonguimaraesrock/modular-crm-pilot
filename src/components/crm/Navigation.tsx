@@ -4,12 +4,16 @@ import {
   Calendar, 
   Send, 
   Settings,
-  BarChart3
+  BarChart3,
+  LogOut,
+  Building,
+  User
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 import { motion } from 'framer-motion';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface NavigationProps {
   activeModule: string;
@@ -18,14 +22,21 @@ interface NavigationProps {
 }
 
 export const Navigation = ({ activeModule, setActiveModule, isMobile = false }: NavigationProps) => {
-  const modules = [
-    { id: 'dashboard', name: 'Dashboard', icon: BarChart3, notifications: 0 },
-    { id: 'leads', name: 'Captura de Leads', icon: Users, notifications: 0 },
-    { id: 'qualification', name: 'Qualificação IA', icon: MessageSquare, notifications: 0 },
-    { id: 'calendar', name: 'Agendamento', icon: Calendar, notifications: 0 },
-    { id: 'whatsapp', name: 'WhatsApp', icon: Send, notifications: 0 },
-    { id: 'admin', name: 'Configurações', icon: Settings, notifications: 0 },
+  const { user, logout } = useAuth();
+  
+  // Filtrar módulos baseado no tipo de usuário
+  const allModules = [
+    { id: 'dashboard', name: 'Dashboard', icon: BarChart3, notifications: 0, allowedTypes: ['school', 'seller'] },
+    { id: 'leads', name: 'Captura de Leads', icon: Users, notifications: 0, allowedTypes: ['school', 'seller'] },
+    { id: 'qualification', name: 'Qualificação IA', icon: MessageSquare, notifications: 0, allowedTypes: ['school', 'seller'] },
+    { id: 'calendar', name: 'Agendamento', icon: Calendar, notifications: 0, allowedTypes: ['school', 'seller'] },
+    { id: 'whatsapp', name: 'WhatsApp', icon: Send, notifications: 0, allowedTypes: ['school'] },
+    { id: 'admin', name: 'Configurações', icon: Settings, notifications: 0, allowedTypes: ['school'] },
   ];
+
+  const modules = allModules.filter(module => 
+    user && module.allowedTypes.includes(user.type)
+  );
 
   const container = {
     hidden: { opacity: 0, x: isMobile ? 0 : -50 },
@@ -143,10 +154,45 @@ export const Navigation = ({ activeModule, setActiveModule, isMobile = false }: 
           })}
         </div>
 
+        {/* User Info */}
+        <motion.div 
+          className={`${
+            isMobile ? 'mt-8' : 'mt-6'
+          } p-3 bg-slate-700/30 rounded-lg border border-slate-600`}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+        >
+          <div className="flex items-center space-x-2 mb-2">
+            {user?.type === 'school' ? (
+              <Building className="w-4 h-4 text-blue-400" />
+            ) : (
+              <User className="w-4 h-4 text-purple-400" />
+            )}
+            <span className={`${
+              isMobile ? 'text-sm' : 'text-xs'
+            } text-slate-300 font-medium`}>
+              {user?.name}
+            </span>
+          </div>
+          <p className={`${
+            isMobile ? 'text-xs' : 'text-xs'
+          } text-slate-400`}>
+            {user?.type === 'school' ? 'Administrador da Escola' : 'Vendedor'}
+          </p>
+          {user?.school && user.type === 'seller' && (
+            <p className={`${
+              isMobile ? 'text-xs' : 'text-xs'
+            } text-slate-500 mt-1`}>
+              {user.school.name}
+            </p>
+          )}
+        </motion.div>
+
         {/* Status Online */}
         <motion.div 
           className={`${
-            isMobile ? 'mt-12' : 'mt-8'
+            isMobile ? 'mt-4' : 'mt-4'
           } p-3 bg-slate-700/30 rounded-lg border border-slate-600`}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -165,6 +211,33 @@ export const Navigation = ({ activeModule, setActiveModule, isMobile = false }: 
           } text-slate-400 mt-1`}>
             Pronto para dados reais
           </p>
+        </motion.div>
+
+        {/* Logout Button */}
+        <motion.div 
+          className={`${
+            isMobile ? 'mt-4' : 'mt-4'
+          }`}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1 }}
+        >
+          <Button
+            onClick={logout}
+            variant="ghost"
+            className={`w-full justify-start ${
+              isMobile ? 'h-12' : 'h-10'
+            } text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all duration-300`}
+          >
+            <LogOut className={`${
+              isMobile ? 'mr-3' : 'mr-2'
+            }`} size={isMobile ? 18 : 16} />
+            <span className={`font-medium ${
+              isMobile ? 'text-base' : 'text-sm'
+            }`}>
+              Sair
+            </span>
+          </Button>
         </motion.div>
 
         {/* Mobile Footer */}

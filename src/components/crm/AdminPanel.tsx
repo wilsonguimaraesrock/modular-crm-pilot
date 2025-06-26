@@ -48,6 +48,7 @@ import {
 import { motion } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useAuth } from '@/contexts/AuthContext';
 
 export const AdminPanel = () => {
   // Hook para detectar dispositivos móveis
@@ -79,20 +80,10 @@ CRITÉRIOS DE QUALIFICAÇÃO:
 
 Inicie sempre com uma pergunta sobre os desafios atuais da empresa.`);
 
-  /**
-   * ESTADO: Equipe de vendas
-   * 
-   * Gerencia todos os vendedores da empresa com suas informações:
-   * - name: Nome completo do vendedor
-   * - phone: Telefone para contato
-   * - role: Cargo/função na empresa
-   * - active: Status ativo/inativo (controla atribuições automáticas)
-   */
-  const [salesTeam, setSalesTeam] = useState([
-    { name: 'Carlos Silva', phone: '+55 11 99999-9999', role: 'Vendedor Senior', active: true },
-    { name: 'Ana Santos', phone: '+55 11 88888-8888', role: 'Vendedora Pleno', active: true },
-    { name: 'Pedro Costa', phone: '+55 11 77777-7777', role: 'Vendedor Junior', active: false },
-  ]);
+  const { user, getSellersBySchool, registerSeller, updateSeller, deleteSeller } = useAuth();
+  
+  // Buscar vendedores da escola atual
+  const salesTeam = user ? getSellersBySchool(user.schoolId) : [];
 
   /**
    * ESTADO: Fontes de Captura de Leads (FUNCIONALIDADE PRINCIPAL)
