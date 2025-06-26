@@ -5,37 +5,38 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Send, MessageSquare } from 'lucide-react';
+import { Send, MessageSquare, Settings, ExternalLink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export const WhatsAppIntegration = () => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [message, setMessage] = useState('');
+  const [chatwootConfig, setChatwootConfig] = useState({
+    url: '',
+    token: '',
+    inboxId: ''
+  });
+  const [isConfigured, setIsConfigured] = useState(false);
   const { toast } = useToast();
 
   const defaultMessage = `🎯 *Lead Qualificado - CRM Inteligente*
 
-Olá! Identifiquei um lead com alto potencial de conversão:
+Olá! Identifiquei um lead com alto potencial de conversão através do nosso sistema de IA.
 
-📊 *Score de Qualificação:* 95/100
-👤 *Nome:* [Nome do Lead]
-📧 *Email:* [Email do Lead]
-🏢 *Empresa:* [Empresa do Lead]
+📊 *Informações do Lead:*
+- Score de Qualificação: [Score]/100
+- Nome: [Nome do Lead]
+- Email: [Email do Lead]
+- Telefone: [Telefone do Lead]
 
-💡 *Resumo da Conversa:*
-- Demonstrou interesse em automação de vendas
-- Possui orçamento disponível
-- Urgência: Alta
-- Empresa de médio porte (50+ funcionários)
-
-✅ *Próximos Passos:*
+💡 *Próximos Passos:*
 1. Entrar em contato em até 1 hora
 2. Agendar demonstração
 3. Enviar proposta comercial
 
-*Enviado automaticamente pelo SDR Virtual*`;
+*Enviado automaticamente pelo CRM Inteligente*`;
 
-  const handleSendWhatsApp = () => {
+  const handleSendWhatsApp = async () => {
     if (!phoneNumber.trim()) {
       toast({
         title: "Erro",
@@ -45,25 +46,136 @@ Olá! Identifiquei um lead com alto potencial de conversão:
       return;
     }
 
-    console.log('Enviando WhatsApp:', { phoneNumber, message });
-    
-    toast({
-      title: "Mensagem Enviada!",
-      description: "Lead encaminhado com sucesso para o WhatsApp",
-    });
+    if (!isConfigured) {
+      toast({
+        title: "Configuração necessária",
+        description: "Configure o Chatwoot primeiro",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    setPhoneNumber('');
-    setMessage('');
+    try {
+      // Chatwoot API call
+      const response = await fetch(`${chatwootConfig.url}/api/v1/accounts/1/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'api_access_token': chatwootConfig.token
+        },
+        body: JSON.stringify({
+          content: message || defaultMessage,
+          message_type: 'outgoing',
+          phone_number: phoneNumber,
+          inbox_id: chatwootConfig.inboxId
+        })
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Mensagem Enviada!",
+          description: "Lead encaminhado com sucesso via Chatwoot",
+        });
+        setPhoneNumber('');
+        setMessage('');
+      } else {
+        throw new Error('Erro na API do Chatwoot');
+      }
+    } catch (error) {
+      console.error('Erro:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao enviar mensagem. Verifique as configurações.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const sentMessages = [
-    { client: 'Maria Silva', phone: '+55 11 99999-9999', score: 95, sentAt: '10:30' },
-    { client: 'João Santos', phone: '+55 11 88888-8888', score: 87, sentAt: '09:15' },
-    { client: 'Ana Costa', phone: '+55 11 77777-7777', score: 92, sentAt: '14:45' },
-  ];
+  const handleConfigureChatwoot = () => {
+    if (!chatwootConfig.url || !chatwootConfig.token || !chatwootConfig.inboxId) {
+      toast({
+        title: "Erro",
+        description: "Preencha todos os campos de configuração",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsConfigured(true);
+    toast({
+      title: "Configurado!",
+      description: "Chatwoot configurado com sucesso",
+    });
+  };
 
   return (
     <div className="space-y-6">
+      {/* Chatwoot Configuration */}
+      {!isConfigured && (
+        <Card className="p-6 bg-slate-800/50 backdrop-blur-sm border-slate-700 border-blue-500/50">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Settings className="text-blue-400" />
+                <h3 className="text-lg font-semibold text-white">Configurar Chatwoot</h3>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-blue-400 border-blue-400 hover:bg-blue-400/10"
+                onClick={() => window.open('https://chatwoot.com', '_blank')}
+              >
+                <ExternalLink className="mr-2" size={16} />
+                Chatwoot.com
+              </Button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="chatwoot-url" className="text-slate-300">URL do Chatwoot</Label>
+                <Input
+                  id="chatwoot-url"
+                  value={chatwootConfig.url}
+                  onChange={(e) => setChatwootConfig({...chatwootConfig, url: e.target.value})}
+                  placeholder="https://app.chatwoot.com"
+                  className="bg-slate-700/50 border-slate-600 text-white"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="chatwoot-token" className="text-slate-300">API Token</Label>
+                <Input
+                  id="chatwoot-token"
+                  type="password"
+                  value={chatwootConfig.token}
+                  onChange={(e) => setChatwootConfig({...chatwootConfig, token: e.target.value})}
+                  placeholder="seu-api-token"
+                  className="bg-slate-700/50 border-slate-600 text-white"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="inbox-id" className="text-slate-300">Inbox ID</Label>
+                <Input
+                  id="inbox-id"
+                  value={chatwootConfig.inboxId}
+                  onChange={(e) => setChatwootConfig({...chatwootConfig, inboxId: e.target.value})}
+                  placeholder="1"
+                  className="bg-slate-700/50 border-slate-600 text-white"
+                />
+              </div>
+            </div>
+            
+            <Button
+              onClick={handleConfigureChatwoot}
+              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
+            >
+              Configurar Chatwoot
+            </Button>
+          </div>
+        </Card>
+      )}
+
       {/* Send Message Form */}
       <Card className="p-6 bg-slate-800/50 backdrop-blur-sm border-slate-700">
         <h2 className="text-2xl font-semibold text-white mb-6">Envio para WhatsApp</h2>
@@ -94,85 +206,62 @@ Olá! Identifiquei um lead com alto potencial de conversão:
           
           <Button
             onClick={handleSendWhatsApp}
-            className="w-full bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700"
+            disabled={!isConfigured}
+            className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:opacity-50"
           >
             <Send className="mr-2" size={18} />
-            Enviar para WhatsApp
+            Enviar via Chatwoot
           </Button>
         </div>
       </Card>
 
-      {/* API Configuration */}
+      {/* Integration Status */}
       <Card className="p-6 bg-slate-800/50 backdrop-blur-sm border-slate-700">
-        <h3 className="text-lg font-semibold text-white mb-4">Configuração da API</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[
-            { provider: 'Z-API', status: 'Ativo', color: 'bg-green-500' },
-            { provider: 'UltraMsg', status: 'Configurar', color: 'bg-yellow-500' },
-            { provider: 'Meta Cloud API', status: 'Configurar', color: 'bg-yellow-500' },
-          ].map((api, index) => (
-            <div key={index} className="p-4 bg-slate-700/30 rounded-lg">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-white font-medium">{api.provider}</span>
-                <span className={`px-2 py-1 rounded-full text-xs ${api.color} text-white`}>
-                  {api.status}
-                </span>
-              </div>
-              <p className="text-slate-400 text-sm">
-                {api.status === 'Ativo' ? 'Funcionando normalmente' : 'Clique para configurar'}
-              </p>
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      {/* Sent Messages History */}
-      <Card className="p-6 bg-slate-800/50 backdrop-blur-sm border-slate-700">
-        <h3 className="text-lg font-semibold text-white mb-4">Mensagens Enviadas</h3>
+        <h3 className="text-lg font-semibold text-white mb-4">Status das Integrações</h3>
         <div className="space-y-3">
-          {sentMessages.map((msg, index) => (
-            <div key={index} className="flex items-center justify-between p-4 bg-slate-700/30 rounded-lg">
-              <div className="flex items-center space-x-4">
-                <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center">
-                  <MessageSquare className="text-white" size={18} />
-                </div>
-                <div>
-                  <p className="text-white font-medium">{msg.client}</p>
-                  <p className="text-slate-400 text-sm">{msg.phone}</p>
-                </div>
+          <div className="flex items-center justify-between p-4 bg-slate-700/30 rounded-lg">
+            <div className="flex items-center space-x-4">
+              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
+                <MessageSquare className="text-white" size={18} />
               </div>
-              <div className="text-right">
-                <p className="text-white font-semibold">Score: {msg.score}</p>
-                <p className="text-slate-400 text-sm">Enviado às {msg.sentAt}</p>
+              <div>
+                <p className="text-white font-medium">Chatwoot</p>
+                <p className="text-slate-400 text-sm">Plataforma de comunicação</p>
               </div>
             </div>
-          ))}
+            <div className="text-right">
+              <span className={`px-3 py-1 rounded-full text-xs ${
+                isConfigured 
+                  ? 'bg-green-500/20 text-green-400' 
+                  : 'bg-yellow-500/20 text-yellow-400'
+              }`}>
+                {isConfigured ? 'Configurado' : 'Pendente'}
+              </span>
+            </div>
+          </div>
         </div>
       </Card>
 
-      {/* Template Messages */}
+      {/* Instructions */}
       <Card className="p-6 bg-slate-800/50 backdrop-blur-sm border-slate-700">
-        <h3 className="text-lg font-semibold text-white mb-4">Templates de Mensagem</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[
-            { name: 'Lead Qualificado', usage: '87%' },
-            { name: 'Reunião Agendada', usage: '65%' },
-            { name: 'Follow-up', usage: '43%' },
-            { name: 'Proposta Enviada', usage: '29%' },
-          ].map((template, index) => (
-            <div key={index} className="p-4 bg-slate-700/30 rounded-lg">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-white font-medium">{template.name}</span>
-                <span className="text-slate-400 text-sm">{template.usage}</span>
-              </div>
-              <div className="w-full bg-slate-600 rounded-full h-2">
-                <div
-                  className="bg-gradient-to-r from-green-500 to-blue-500 h-2 rounded-full"
-                  style={{ width: template.usage }}
-                />
-              </div>
-            </div>
-          ))}
+        <h3 className="text-lg font-semibold text-white mb-4">Como Configurar</h3>
+        <div className="space-y-3 text-slate-300">
+          <div className="flex items-start space-x-3">
+            <span className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">1</span>
+            <p>Crie uma conta no Chatwoot (chatwoot.com)</p>
+          </div>
+          <div className="flex items-start space-x-3">
+            <span className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">2</span>
+            <p>Configure um Inbox do tipo WhatsApp</p>
+          </div>
+          <div className="flex items-start space-x-3">
+            <span className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">3</span>
+            <p>Obtenha seu API Token em Profile Settings → Access Token</p>
+          </div>
+          <div className="flex items-start space-x-3">
+            <span className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">4</span>
+            <p>Anote o ID do seu Inbox (disponível nas configurações)</p>
+          </div>
         </div>
       </Card>
     </div>

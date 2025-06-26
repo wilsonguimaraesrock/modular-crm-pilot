@@ -20,10 +20,10 @@ interface NavigationProps {
 export const Navigation = ({ activeModule, setActiveModule }: NavigationProps) => {
   const modules = [
     { id: 'dashboard', name: 'Dashboard', icon: BarChart3, notifications: 0 },
-    { id: 'leads', name: 'Captura de Leads', icon: Users, notifications: 3 },
-    { id: 'qualification', name: 'Qualificação IA', icon: MessageSquare, notifications: 7 },
-    { id: 'calendar', name: 'Agendamento', icon: Calendar, notifications: 2 },
-    { id: 'whatsapp', name: 'WhatsApp', icon: Send, notifications: 1 },
+    { id: 'leads', name: 'Captura de Leads', icon: Users, notifications: 0 },
+    { id: 'qualification', name: 'Qualificação IA', icon: MessageSquare, notifications: 0 },
+    { id: 'calendar', name: 'Agendamento', icon: Calendar, notifications: 0 },
+    { id: 'whatsapp', name: 'WhatsApp', icon: Send, notifications: 0 },
     { id: 'admin', name: 'Configurações', icon: Settings, notifications: 0 },
   ];
 
@@ -55,9 +55,9 @@ export const Navigation = ({ activeModule, setActiveModule }: NavigationProps) =
           <div className="mb-6">
             <h2 className="text-lg font-semibold text-white mb-2">CRM Inteligente</h2>
             <div className="w-full bg-slate-700 rounded-full h-2">
-              <div className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full w-3/4"></div>
+              <div className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full w-0"></div>
             </div>
-            <p className="text-xs text-slate-400 mt-1">75% das metas atingidas</p>
+            <p className="text-xs text-slate-400 mt-1">Iniciando sistema...</p>
           </div>
 
           {modules.map((module, index) => {
@@ -73,7 +73,7 @@ export const Navigation = ({ activeModule, setActiveModule }: NavigationProps) =
                       variant={isActive ? "default" : "ghost"}
                       className={`w-full justify-start h-12 transition-all duration-300 ${
                         isActive
-                          ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg scale-105'
+                          ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg scale-105'
                           : 'text-slate-300 hover:bg-slate-700/50 hover:text-white hover:scale-105'
                       }`}
                     >
@@ -116,7 +116,7 @@ export const Navigation = ({ activeModule, setActiveModule }: NavigationProps) =
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
             <span className="text-xs text-slate-300">Sistema Online</span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">Última sync: agora</p>
+          <p className="text-xs text-slate-400 mt-1">Aguardando dados...</p>
         </motion.div>
       </motion.nav>
     </TooltipProvider>

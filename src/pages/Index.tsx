@@ -31,7 +31,7 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
       <div className="flex">
         <Navigation activeModule={activeModule} setActiveModule={setActiveModule} />
         <main className="flex-1 p-6">
@@ -41,7 +41,7 @@ const Index = () => {
                 CRM Inteligente
               </h1>
               <p className="text-slate-300">
-                Sistema de gestão de leads com IA e integração WhatsApp
+                Sistema de gestão de leads com IA e integração WhatsApp via Chatwoot
               </p>
             </header>
             {renderActiveModule()}

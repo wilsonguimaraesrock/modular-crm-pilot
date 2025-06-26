@@ -3,23 +3,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Users, MessageSquare, Calendar, Send, TrendingUp, Clock } from 'lucide-react';
+import { Users, MessageSquare, Calendar, Send, TrendingUp, Plus } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export const DashboardOverview = () => {
   const stats = [
-    { label: 'Leads Capturados', value: '127', icon: Users, color: 'from-blue-500 to-blue-600', trend: '+12%' },
-    { label: 'Qualificados pela IA', value: '89', icon: MessageSquare, color: 'from-purple-500 to-purple-600', trend: '+8%' },
-    { label: 'Reuniões Agendadas', value: '34', icon: Calendar, color: 'from-green-500 to-green-600', trend: '+15%' },
-    { label: 'Enviados WhatsApp', value: '23', icon: Send, color: 'from-orange-500 to-orange-600', trend: '+5%' },
-  ];
-
-  const recentLeads = [
-    { name: 'Maria Silva', email: 'maria@email.com', score: 95, status: 'Qualificado', time: '2min' },
-    { name: 'João Santos', email: 'joao@email.com', score: 78, status: 'Em Análise', time: '5min' },
-    { name: 'Ana Costa', email: 'ana@email.com', score: 92, status: 'Agendado', time: '10min' },
-    { name: 'Pedro Lima', email: 'pedro@email.com', score: 85, status: 'Qualificado', time: '15min' },
+    { label: 'Leads Capturados', value: '0', icon: Users, color: 'from-blue-500 to-blue-600' },
+    { label: 'Qualificados pela IA', value: '0', icon: MessageSquare, color: 'from-blue-600 to-blue-700' },
+    { label: 'Reuniões Agendadas', value: '0', icon: Calendar, color: 'from-blue-700 to-blue-800' },
+    { label: 'Enviados WhatsApp', value: '0', icon: Send, color: 'from-blue-800 to-blue-900' },
   ];
 
   const container = {
@@ -57,10 +49,6 @@ export const DashboardOverview = () => {
                       <p className="text-slate-400 text-sm font-medium">{stat.label}</p>
                       <div className="flex items-center space-x-2">
                         <p className="text-3xl font-bold text-white">{stat.value}</p>
-                        <Badge variant="secondary" className="text-green-400 bg-green-400/10">
-                          <TrendingUp className="w-3 h-3 mr-1" />
-                          {stat.trend}
-                        </Badge>
                       </div>
                     </div>
                     <div className={`p-3 rounded-lg bg-gradient-to-r ${stat.color} group-hover:scale-110 transition-transform duration-300`}>
@@ -87,10 +75,10 @@ export const DashboardOverview = () => {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               {[
-                { stage: 'Novos Leads', count: 45, color: 'bg-blue-500', progress: 75 },
-                { stage: 'Qualificados', count: 32, color: 'bg-purple-500', progress: 60 },
-                { stage: 'Agendados', count: 18, color: 'bg-green-500', progress: 45 },
-                { stage: 'Fechados', count: 12, color: 'bg-orange-500', progress: 30 },
+                { stage: 'Novos Leads', count: 0, color: 'bg-blue-500', progress: 0 },
+                { stage: 'Qualificados', count: 0, color: 'bg-blue-600', progress: 0 },
+                { stage: 'Agendados', count: 0, color: 'bg-blue-700', progress: 0 },
+                { stage: 'Fechados', count: 0, color: 'bg-blue-800', progress: 0 },
               ].map((stage, index) => (
                 <motion.div 
                   key={index} 
@@ -110,58 +98,26 @@ export const DashboardOverview = () => {
         </Card>
       </motion.div>
 
-      {/* Recent Leads */}
+      {/* Welcome Card */}
       <motion.div variants={item}>
         <Card className="bg-slate-800/50 backdrop-blur-sm border-slate-700">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-xl font-semibold text-white">Leads Recentes</CardTitle>
-            <Button variant="outline" size="sm" className="text-slate-300 border-slate-600 hover:bg-slate-700">
-              Ver Todos
-            </Button>
+          <CardHeader>
+            <CardTitle className="text-xl font-semibold text-white">Bem-vindo ao CRM Inteligente</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {recentLeads.map((lead, index) => (
-                <motion.div 
-                  key={index} 
-                  className="flex items-center justify-between p-4 bg-slate-700/30 rounded-lg hover:bg-slate-700/50 transition-all duration-300 cursor-pointer border border-transparent hover:border-slate-600"
-                  whileHover={{ x: 4 }}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                >
-                  <div className="flex items-center space-x-3">
-                    <Avatar className="h-10 w-10">
-                      <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold">
-                        {lead.name[0]}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="text-white font-medium">{lead.name}</p>
-                      <p className="text-slate-400 text-sm">{lead.email}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-4">
-                    <div className="text-center">
-                      <p className="text-white font-semibold">{lead.score}</p>
-                      <p className="text-slate-400 text-xs">Score</p>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Badge className={
-                        lead.status === 'Qualificado' ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' :
-                        lead.status === 'Agendado' ? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30' :
-                        'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
-                      }>
-                        {lead.status}
-                      </Badge>
-                      <div className="flex items-center text-slate-400 text-xs">
-                        <Clock className="w-3 h-3 mr-1" />
-                        {lead.time}
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
+            <div className="space-y-4">
+              <p className="text-slate-300">
+                Seu sistema está pronto para começar. Configure as integrações e comece a capturar leads.
+              </p>
+              <div className="flex space-x-3">
+                <Button className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800">
+                  <Plus className="mr-2" size={18} />
+                  Capturar Primeiro Lead
+                </Button>
+                <Button variant="outline" className="text-slate-300 border-slate-600 hover:bg-slate-700">
+                  Configurar Integrações
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
