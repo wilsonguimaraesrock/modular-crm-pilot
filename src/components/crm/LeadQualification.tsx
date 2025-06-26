@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,8 +6,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Send, Bot, Settings } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export const LeadQualification = () => {
+  const isMobile = useIsMobile();
   const [messages, setMessages] = useState([
     {
       type: 'system',
@@ -129,29 +130,45 @@ export const LeadQualification = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-${isMobile ? '4' : '6'}`}>
       {/* Configuration */}
       {!isConfigured && (
-        <Card className="p-6 bg-slate-800/50 backdrop-blur-sm border-slate-700 border-blue-500/50">
-          <div className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Settings className="text-blue-400" />
-              <h3 className="text-lg font-semibold text-white">Configurar ChatGPT</h3>
+        <Card className={`${
+          isMobile ? 'p-4' : 'p-6'
+        } bg-slate-800/50 backdrop-blur-sm border-slate-700 border-blue-500/50`}>
+          <div className={`space-y-${isMobile ? '3' : '4'}`}>
+            <div className={`flex items-center ${
+              isMobile ? 'space-x-1' : 'space-x-2'
+            }`}>
+              <Settings className="text-blue-400" size={isMobile ? 18 : 24} />
+              <h3 className={`${
+                isMobile ? 'text-base' : 'text-lg'
+              } font-semibold text-white`}>
+                Configurar ChatGPT
+              </h3>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="apikey" className="text-slate-300">API Key do ChatGPT</Label>
+              <Label htmlFor="apikey" className={`text-slate-300 ${
+                isMobile ? 'text-sm' : ''
+              }`}>
+                API Key do ChatGPT
+              </Label>
               <Input
                 id="apikey"
                 type="password"
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 placeholder="sk-..."
-                className="bg-slate-700/50 border-slate-600 text-white"
+                className={`bg-slate-700/50 border-slate-600 text-white ${
+                  isMobile ? 'h-12' : ''
+                }`}
               />
             </div>
             <Button
               onClick={handleConfigureAPI}
-              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
+              className={`bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 ${
+                isMobile ? 'h-12 w-full' : ''
+              }`}
             >
               Configurar API
             </Button>
@@ -160,29 +177,59 @@ export const LeadQualification = () => {
       )}
 
       {/* Lead Score */}
-      <Card className="p-6 bg-slate-800/50 backdrop-blur-sm border-slate-700">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Bot className="text-blue-400" />
-            <h2 className="text-2xl font-semibold text-white">Qualificação com IA</h2>
+      <Card className={`${
+        isMobile ? 'p-4' : 'p-6'
+      } bg-slate-800/50 backdrop-blur-sm border-slate-700`}>
+        <div className={`${
+          isMobile 
+            ? 'flex flex-col space-y-3' 
+            : 'flex items-center justify-between'
+        }`}>
+          <div className={`flex items-center ${
+            isMobile ? 'space-x-1' : 'space-x-2'
+          }`}>
+            <Bot className="text-blue-400" size={isMobile ? 18 : 24} />
+            <h2 className={`${
+              isMobile ? 'text-lg' : 'text-2xl'
+            } font-semibold text-white`}>
+              Qualificação com IA
+            </h2>
           </div>
-          <div className="text-center">
-            <p className="text-slate-300 text-sm">Score do Lead</p>
-            <p className={`text-3xl font-bold ${getScoreColor(leadScore)}`}>{leadScore}/100</p>
+          <div className={`text-center ${
+            isMobile ? 'self-end' : ''
+          }`}>
+            <p className={`text-slate-300 ${
+              isMobile ? 'text-xs' : 'text-sm'
+            }`}>
+              Score do Lead
+            </p>
+            <p className={`${
+              isMobile ? 'text-2xl' : 'text-3xl'
+            } font-bold ${getScoreColor(leadScore)}`}>
+              {leadScore}/100
+            </p>
           </div>
         </div>
       </Card>
 
       {/* Chat Interface */}
-      <Card className="p-6 bg-slate-800/50 backdrop-blur-sm border-slate-700">
-        <div className="h-96 overflow-y-auto mb-4 space-y-4">
+      <Card className={`${
+        isMobile ? 'p-4' : 'p-6'
+      } bg-slate-800/50 backdrop-blur-sm border-slate-700`}>
+        <div className={`${
+          isMobile ? 'h-64' : 'h-96'
+        } overflow-y-auto mb-4 space-y-${isMobile ? '2' : '4'}`}>
           {messages.map((message, index) => (
             <div
               key={index}
               className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <div
-                className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                className={`${
+                  isMobile ? 'max-w-[80%]' : 'max-w-xs lg:max-w-md'
+                } ${
+                  isMobile ? 'px-3 py-2' : 'px-4 py-2'
+                } rounded-lg ${
                   message.type === 'user'
                     ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white'
                     : message.type === 'ai'
@@ -190,8 +237,14 @@ export const LeadQualification = () => {
                     : 'bg-yellow-600/20 text-yellow-200 border border-yellow-600/50'
                 }`}
               >
-                <p className="text-sm">{message.content}</p>
-                <p className="text-xs opacity-70 mt-1">
+                <p className={`${
+                  isMobile ? 'text-xs' : 'text-sm'
+                }`}>
+                  {message.content}
+                </p>
+                <p className={`${
+                  isMobile ? 'text-xs' : 'text-xs'
+                } opacity-70 mt-1`}>
                   {message.timestamp.toLocaleTimeString()}
                 </p>
               </div>
@@ -199,29 +252,45 @@ export const LeadQualification = () => {
           ))}
         </div>
 
-        <div className="flex space-x-2">
+        <div className={`flex ${
+          isMobile ? 'space-x-1' : 'space-x-2'
+        }`}>
           <Input
             value={currentMessage}
             onChange={(e) => setCurrentMessage(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
             placeholder="Digite sua mensagem..."
-            className="bg-slate-700/50 border-slate-600 text-white"
+            className={`bg-slate-700/50 border-slate-600 text-white ${
+              isMobile ? 'h-12 text-sm' : ''
+            }`}
             disabled={!isConfigured}
           />
           <Button
             onClick={handleSendMessage}
             disabled={!isConfigured}
-            className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
+            className={`bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 ${
+              isMobile ? 'h-12 px-3' : ''
+            }`}
           >
-            <Send size={18} />
+            <Send size={isMobile ? 16 : 18} />
           </Button>
         </div>
       </Card>
 
       {/* Qualification Results */}
-      <Card className="p-6 bg-slate-800/50 backdrop-blur-sm border-slate-700">
-        <h3 className="text-lg font-semibold text-white mb-4">Critérios de Qualificação</h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <Card className={`${
+        isMobile ? 'p-4' : 'p-6'
+      } bg-slate-800/50 backdrop-blur-sm border-slate-700`}>
+        <h3 className={`${
+          isMobile ? 'text-base' : 'text-lg'
+        } font-semibold text-white mb-${isMobile ? '3' : '4'}`}>
+          Critérios de Qualificação
+        </h3>
+        <div className={`grid ${
+          isMobile 
+            ? 'grid-cols-2 gap-3' 
+            : 'grid-cols-1 md:grid-cols-4 gap-4'
+        }`}>
           {[
             { criteria: 'Interesse', score: Math.min(leadScore, 25), max: 25 },
             { criteria: 'Urgência', score: Math.min(Math.max(0, leadScore - 25), 25), max: 25 },
@@ -229,14 +298,22 @@ export const LeadQualification = () => {
             { criteria: 'Autoridade', score: Math.min(Math.max(0, leadScore - 75), 25), max: 25 },
           ].map((item, index) => (
             <div key={index} className="text-center">
-              <p className="text-slate-300 font-medium mb-2">{item.criteria}</p>
+              <p className={`text-slate-300 font-medium mb-2 ${
+                isMobile ? 'text-xs' : ''
+              }`}>
+                {item.criteria}
+              </p>
               <div className="w-full bg-slate-700 rounded-full h-2 mb-2">
                 <div
                   className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full transition-all duration-500"
                   style={{ width: `${(Math.max(0, item.score) / item.max) * 100}%` }}
                 />
               </div>
-              <p className="text-white font-semibold">{Math.max(0, item.score)}/{item.max}</p>
+              <p className={`text-white font-semibold ${
+                isMobile ? 'text-sm' : ''
+              }`}>
+                {Math.max(0, item.score)}/{item.max}
+              </p>
             </div>
           ))}
         </div>
