@@ -119,12 +119,14 @@ const [leads, setLeads] = useState<any[]>([]);
 
 ### **3. 🤖 Qualificação com IA (LeadQualification.tsx)**
 
-**Funcionalidade**: Sistema de qualificação automática usando ChatGPT para avaliar leads através de conversas estruturadas.
+**Funcionalidade**: Sistema de qualificação automática usando ChatGPT para avaliar leads através de conversas estruturadas com distribuição equitativa entre vendedores.
 
 **Componentes Principais**:
 - **Configuração de API**: Setup da integração com ChatGPT
 - **Interface de Chat**: Conversa em tempo real com a IA
 - **Sistema de Pontuação**: Score automático baseado nas respostas
+- **Distribuição de Vendedores**: Atribuição automática e equitativa de leads
+- **Apresentação Personalizada**: Introdução com nome do vendedor atribuído
 
 **Estados Gerenciados**:
 ```typescript
@@ -133,28 +135,64 @@ const [currentMessage, setCurrentMessage] = useState(''); // Mensagem atual
 const [leadScore, setLeadScore] = useState(0);     // Pontuação do lead (0-100)
 const [apiKey, setApiKey] = useState('');          // API Key do ChatGPT
 const [isConfigured, setIsConfigured] = useState(false); // Status da configuração
+const [assignedSeller, setAssignedSeller] = useState<Seller | null>(null); // Vendedor atribuído
+const [currentStage, setCurrentStage] = useState(0); // Estágio atual BANT
+const [stageScores, setStageScores] = useState<Record<string, number>>({}); // Pontuações por estágio
 ```
 
 **Funcionalidades**:
 - ✅ Integração completa com ChatGPT
-- ✅ Sistema de pontuação inteligente
+- ✅ Sistema de pontuação inteligente BANT
 - ✅ Interface de chat fluida
 - ✅ Configuração segura de API
 - ✅ Análise automática de respostas
 - ✅ SDR Virtual configurável
+- ✅ **Distribuição equitativa de leads entre vendedores**
+- ✅ **Apresentação personalizada com nome do vendedor**
+- ✅ **Rastreamento visual do vendedor atribuído**
+- ✅ **Metodologia BANT estruturada (Budget, Authority, Need, Timing)**
+- ✅ **Conversação sequencial inteligente**
 
-**Algoritmo de Pontuação**:
+**Sistema de Distribuição Equitativa**:
 ```typescript
-const analyzeResponse = (message: string) => {
-  const qualifyingKeywords = [
-    'interessado', 'preciso', 'urgente', 
-    'orçamento', 'comprar', 'investir'
-  ];
-  const hasKeyword = qualifyingKeywords.some(keyword => 
-    message.toLowerCase().includes(keyword)
-  );
-  return hasKeyword ? 15 : 5; // Incremento baseado em palavras-chave
+const getNextAvailableSeller = (schoolId: string): Seller | null => {
+  // Buscar vendedores ativos da escola
+  const activeSellers = getSellersBySchool(schoolId).filter(seller => seller.active);
+  
+  if (activeSellers.length === 0) return null;
+  if (activeSellers.length === 1) return activeSellers[0];
+  
+  // Contar leads atribuídos a cada vendedor
+  const schoolLeads = getLeadsBySchool(schoolId);
+  const sellerLeadCounts = activeSellers.map(seller => ({
+    seller,
+    leadCount: schoolLeads.filter(lead => lead.assignedTo === seller.id).length
+  }));
+  
+  // Ordenar por menor número de leads e retornar o primeiro
+  sellerLeadCounts.sort((a, b) => a.leadCount - b.leadCount);
+  return sellerLeadCounts[0].seller;
 };
+```
+
+**Algoritmo de Pontuação BANT**:
+```typescript
+const qualificationStages = [
+  {
+    id: 'interest',
+    name: 'Interesse',
+    question: 'Vi que você demonstrou interesse em nossos cursos...',
+    keywords: ['trabalho', 'carreira', 'viagem', 'estudo'],
+    maxScore: 25
+  },
+  {
+    id: 'urgency', 
+    name: 'Urgência',
+    keywords: ['urgente', 'rápido', 'logo', 'mês'],
+    maxScore: 25
+  },
+  // ... outros estágios
+];
 ```
 
 ---
@@ -298,7 +336,7 @@ const [newSource, setNewSource] = useState({
 
 #### **6.3 👥 Gestão de Equipe**
 
-**Objetivo**: Gerenciar vendedores e suas atribuições.
+**Objetivo**: Gerenciar vendedores e suas atribuições com distribuição automática de leads.
 
 **Estados Gerenciados**:
 ```typescript
@@ -311,6 +349,17 @@ const [salesTeam, setSalesTeam] = useState([
   },
   // ... outros membros
 ]);
+
+// Estatísticas de distribuição
+const [distributionStats, setDistributionStats] = useState([
+  {
+    seller: { name: 'Carlos Silva', role: 'Vendedor Senior' },
+    totalLeads: 45,
+    todayLeads: 3,
+    percentage: 35
+  },
+  // ... outros vendedores
+]);
 ```
 
 **Funcionalidades**:
@@ -318,6 +367,13 @@ const [salesTeam, setSalesTeam] = useState([
 - ✅ Status ativo/inativo
 - ✅ Informações de contato
 - ✅ Hierarquia de cargos
+- ✅ **Painel de Distribuição Equitativa**
+- ✅ **Estatísticas visuais por vendedor**
+- ✅ **Contador de leads por vendedor**
+- ✅ **Percentual de distribuição**
+- ✅ **Leads recebidos hoje**
+- ✅ **Barras de progresso visuais**
+- ✅ **Indicador do sistema automático**
 
 #### **6.4 🔧 Configurações do Sistema**
 
@@ -353,6 +409,59 @@ const modules = [
 - ✅ Badges de notificação
 - ✅ Status do sistema
 - ✅ Animações suaves
+
+---
+
+## 🎯 **Sistema de Distribuição Equitativa de Leads**
+
+### **Funcionalidade Principal**
+O sistema automaticamente distribui novos leads entre os vendedores ativos de forma equilibrada, garantindo que nenhum vendedor fique sobrecarregado e que todos tenham oportunidades iguais.
+
+### **Algoritmo de Distribuição**
+```typescript
+const getNextAvailableSeller = (schoolId: string): Seller | null => {
+  // 1. Buscar vendedores ativos da escola
+  const activeSellers = getSellersBySchool(schoolId).filter(seller => seller.active);
+  
+  // 2. Verificar se há vendedores disponíveis
+  if (activeSellers.length === 0) return null;
+  if (activeSellers.length === 1) return activeSellers[0];
+  
+  // 3. Contar leads atribuídos a cada vendedor
+  const schoolLeads = getLeadsBySchool(schoolId);
+  const sellerLeadCounts = activeSellers.map(seller => ({
+    seller,
+    leadCount: schoolLeads.filter(lead => lead.assignedTo === seller.id).length
+  }));
+  
+  // 4. Ordenar por menor número de leads atribuídos
+  sellerLeadCounts.sort((a, b) => a.leadCount - b.leadCount);
+  
+  // 5. Retornar o vendedor com menos leads
+  return sellerLeadCounts[0].seller;
+};
+```
+
+### **Características do Sistema**
+- **Automático**: Não requer intervenção manual
+- **Equitativo**: Distribui baseado na carga atual de cada vendedor
+- **Isolado por Escola**: Cada escola tem sua distribuição independente
+- **Transparente**: Interface visual mostra a distribuição em tempo real
+- **Flexível**: Considera apenas vendedores ativos
+
+### **Interface Visual**
+O painel administrativo exibe:
+- **Cards por Vendedor**: Mostrando estatísticas individuais
+- **Barras de Progresso**: Indicando percentual de leads atribuídos
+- **Contadores**: Total de leads e leads recebidos hoje
+- **Status Visual**: Badges indicando performance
+- **Indicador Automático**: Confirmação de que o sistema está funcionando
+
+### **Integração com Qualificação IA**
+- Ao iniciar uma conversa, o sistema automaticamente seleciona o próximo vendedor
+- O lead é apresentado com o nome do vendedor atribuído
+- A conversa é personalizada com informações do vendedor
+- Quando o lead for convertido, já estará atribuído ao vendedor correto
 
 ---
 
@@ -426,10 +535,16 @@ npm run preview      # Preview da build
 ### ✅ **Concluídas**:
 - [x] Dashboard com métricas
 - [x] Captura de leads multi-fonte
-- [x] Qualificação com ChatGPT
+- [x] Qualificação com ChatGPT + Metodologia BANT
+- [x] **🎯 Sistema de distribuição equitativa de leads**
+- [x] **👤 Apresentação personalizada com nome do vendedor**
+- [x] **📊 Estatísticas visuais de distribuição no AdminPanel**
+- [x] **🤖 Conversação sequencial inteligente com IA**
+- [x] **🎨 Interface visual do vendedor atribuído**
 - [x] Sistema de agendamento
-- [x] Integração WhatsApp/Chatwoot
+- [x] Integração WhatsApp/WAHA
 - [x] Painel administrativo completo
+- [x] **Gestão inteligente de equipe de vendas**
 - [x] Configuração de fontes de leads
 - [x] Navegação modular
 - [x] Design responsivo

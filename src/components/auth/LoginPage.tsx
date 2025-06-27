@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building, User, Mail, Lock, LogIn, UserPlus } from 'lucide-react';
+import { Building2, User, Mail, Lock, LogIn, UserPlus } from 'lucide-react';
+import { RockfellerLogo } from '@/components/ui/logo';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -113,15 +114,13 @@ export const LoginPage = () => {
       >
         {/* Header */}
         <motion.div variants={item} className="text-center mb-8">
-          <div className={`inline-flex items-center justify-center ${
-            isMobile ? 'w-16 h-16' : 'w-20 h-20'
-          } bg-gradient-to-r from-blue-600 to-purple-600 rounded-full mb-4`}>
-            <Building className="text-white" size={isMobile ? 32 : 40} />
+          <div className="flex justify-center mb-4">
+            <RockfellerLogo size={isMobile ? 'xlarge' : 'xxlarge'} />
           </div>
           <h1 className={`${
             isMobile ? 'text-2xl' : 'text-4xl'
           } font-bold text-white mb-2`}>
-            CRM Rockfeller
+            CRM ROCKFELLER
           </h1>
           <p className={`text-slate-400 ${
             isMobile ? 'text-sm' : 'text-lg'
@@ -151,7 +150,7 @@ export const LoginPage = () => {
                       isMobile ? 'text-xs px-2' : ''
                     }`}
                   >
-                    <Building className={`${
+                    <Building2 className={`${
                       isMobile ? 'mr-1' : 'mr-2'
                     }`} size={isMobile ? 14 : 16} />
                     Escola
@@ -307,13 +306,13 @@ export const LoginPage = () => {
                 <h4 className={`text-white font-medium mb-2 ${
                   isMobile ? 'text-sm' : ''
                 }`}>
-                  Credenciais Demo:
+                  Credenciais de Acesso:
                 </h4>
                 <div className={`space-y-1 ${
                   isMobile ? 'text-xs' : 'text-sm'
                 } text-slate-400`}>
-                  <p><strong>Escola:</strong> admin@rockfeller.com.br / admin123</p>
-                  <p><strong>Vendedor:</strong> carlos@rockfeller.com.br / carlos123</p>
+                  <p><strong>Admin Sede:</strong> admin@rockfeller.com.br / admin123</p>
+                  <p><strong>Vendedores:</strong> Configure na aba Equipe</p>
                 </div>
               </div>
 

@@ -68,7 +68,7 @@ export const Navigation = ({ activeModule, setActiveModule, isMobile = false }: 
       >
         <div className="space-y-2">
           {/* Header */}
-          <div className={`${isMobile ? 'mb-8' : 'mb-6'}`}>
+          <div className={`${isMobile ? 'mb-6' : 'mb-4'}`}>
             <h2 className={`${
               isMobile ? 'text-xl' : 'text-lg'
             } font-semibold text-white mb-2`}>
@@ -79,6 +79,37 @@ export const Navigation = ({ activeModule, setActiveModule, isMobile = false }: 
             </div>
             <p className="text-xs text-slate-400 mt-1">Sistema operacional</p>
           </div>
+
+          {/* User/School Info - Moved to top */}
+          <motion.div 
+            className={`${
+              isMobile ? 'mb-6' : 'mb-4'
+            } p-3 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-lg border border-blue-500/30`}
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <div className="flex items-center space-x-2 mb-1">
+              {user?.type === 'school' ? (
+                <Building className="w-4 h-4 text-blue-400" />
+              ) : (
+                <User className="w-4 h-4 text-purple-400" />
+              )}
+              <span className={`${
+                isMobile ? 'text-sm' : 'text-sm'
+              } text-white font-semibold`}>
+                {user?.type === 'school' && user?.name ? user.name : user?.school?.name || 'Escola'}
+              </span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <p className={`${
+                isMobile ? 'text-xs' : 'text-xs'
+              } text-slate-300`}>
+                {user?.type === 'school' ? 'Administrador' : `Vendedor - ${user?.name || 'Usuário'}`}
+              </p>
+            </div>
+          </motion.div>
 
           {/* Menu Items */}
           {modules.map((module, index) => {
@@ -154,40 +185,7 @@ export const Navigation = ({ activeModule, setActiveModule, isMobile = false }: 
           })}
         </div>
 
-        {/* User Info */}
-        <motion.div 
-          className={`${
-            isMobile ? 'mt-8' : 'mt-6'
-          } p-3 bg-slate-700/30 rounded-lg border border-slate-600`}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-        >
-          <div className="flex items-center space-x-2 mb-2">
-            {user?.type === 'school' ? (
-              <Building className="w-4 h-4 text-blue-400" />
-            ) : (
-              <User className="w-4 h-4 text-purple-400" />
-            )}
-            <span className={`${
-              isMobile ? 'text-sm' : 'text-xs'
-            } text-slate-300 font-medium`}>
-              {user?.name}
-            </span>
-          </div>
-          <p className={`${
-            isMobile ? 'text-xs' : 'text-xs'
-          } text-slate-400`}>
-            {user?.type === 'school' ? 'Administrador da Escola' : 'Vendedor'}
-          </p>
-          {user?.school && user.type === 'seller' && (
-            <p className={`${
-              isMobile ? 'text-xs' : 'text-xs'
-            } text-slate-500 mt-1`}>
-              {user.school.name}
-            </p>
-          )}
-        </motion.div>
+
 
         {/* Status Online */}
         <motion.div 
@@ -196,7 +194,7 @@ export const Navigation = ({ activeModule, setActiveModule, isMobile = false }: 
           } p-3 bg-slate-700/30 rounded-lg border border-slate-600`}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.8 }}
+          transition={{ delay: 0.6 }}
         >
           <div className="flex items-center space-x-2">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
@@ -220,7 +218,7 @@ export const Navigation = ({ activeModule, setActiveModule, isMobile = false }: 
           }`}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1 }}
+          transition={{ delay: 0.8 }}
         >
           <Button
             onClick={logout}

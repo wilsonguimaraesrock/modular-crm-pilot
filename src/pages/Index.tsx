@@ -10,6 +10,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Menu } from 'lucide-react';
+import { RockfellerLogo } from '@/components/ui/logo';
 
 const Index = () => {
   const [activeModule, setActiveModule] = useState('dashboard');
@@ -19,7 +20,7 @@ const Index = () => {
   const renderActiveModule = () => {
     switch (activeModule) {
       case 'dashboard':
-        return <DashboardOverview />;
+        return <DashboardOverview onNavigate={handleModuleChange} />;
       case 'leads':
         return <LeadCapture />;
       case 'qualification':
@@ -31,7 +32,7 @@ const Index = () => {
       case 'admin':
         return <AdminPanel />;
       default:
-        return <DashboardOverview />;
+        return <DashboardOverview onNavigate={handleModuleChange} />;
     }
   };
 
@@ -51,7 +52,7 @@ const Index = () => {
       whatsapp: 'WhatsApp',
       admin: 'Configurações'
     };
-    return titles[activeModule as keyof typeof titles] || 'CRM Inteligente';
+    return titles[activeModule as keyof typeof titles] || 'CRM Rockfeller';
   };
 
   return (
@@ -90,28 +91,41 @@ const Index = () => {
         }`}>
           {/* Header Mobile */}
           {isMobile && (
-            <header className="px-4 py-3 bg-slate-800/50 backdrop-blur-sm border-b border-slate-700 fixed top-0 left-0 right-0 z-40">
+            <header className="px-4 py-1.5 bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 backdrop-blur-sm border-b border-amber-400/30 fixed top-0 left-0 right-0 z-40 shadow-lg">
               <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3 ml-12">
-                  <h1 className="text-lg font-bold text-white truncate">
-                    {getModuleTitle()}
-                  </h1>
-                </div>
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                                  <div className="flex items-center space-x-3 ml-12">
+                    <div className="flex items-center space-x-2">
+                      <RockfellerLogo size="medium" />
+                      <div>
+                        <h1 className="text-lg font-bold text-white">
+                          CRM ROCKFELLER
+                        </h1>
+                        <p className="text-xs text-white/80 -mt-1">
+                          {getModuleTitle()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
               </div>
             </header>
           )}
 
           {/* Header Desktop */}
           {!isMobile && (
-            <header className="p-6 border-b border-slate-700/50">
-              <div className="max-w-7xl mx-auto">
-                <h1 className="text-4xl font-bold text-white mb-2">
-                  CRM Inteligente
-                </h1>
-                <p className="text-slate-300">
-                  Sistema de gestão de leads com IA e integração WhatsApp via Chatwoot
-                </p>
+            <header className="bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 border-b border-amber-400/30 shadow-lg">
+              <div className="max-w-7xl mx-auto px-6 py-3">
+                <div className="flex items-center space-x-4">
+                  <RockfellerLogo size="xlarge" />
+                  <div>
+                    <h1 className="text-4xl font-bold text-white mb-1">
+                      CRM ROCKFELLER
+                    </h1>
+                    <p className="text-white/90 text-lg">
+                      Sistema de gestão de leads com IA e integração WhatsApp via WAHA
+                    </p>
+                  </div>
+                </div>
               </div>
             </header>
           )}

@@ -2,41 +2,140 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
-import { Users, MessageSquare, Calendar, Send, TrendingUp, Plus } from 'lucide-react';
+import { Users, MessageSquare, Calendar, Send, TrendingUp, Plus, Phone, Mail, Clock, User, ArrowLeft } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useAuth, Lead } from '@/contexts/AuthContext';
 
-export const DashboardOverview = () => {
+interface DashboardOverviewProps {
+  onNavigate?: (module: string) => void;
+}
+
+export const DashboardOverview = ({ onNavigate }: DashboardOverviewProps) => {
   const isMobile = useIsMobile();
+  const { user, getLeadStats, getLeadsBySchool, updateLead } = useAuth();
   
-  const [stats, setStats] = useState({
-    leadsCapturados: 0,
-    qualificadosIA: 0,
-    reunioesAgendadas: 0,
-    enviadosWhatsApp: 0
-  });
-
-  const [pipeline, setPipeline] = useState({
-    novosLeads: 0,
+  // Obter estatísticas reais do contexto
+  const stats = user ? getLeadStats(user.schoolId) : {
+    leadsHoje: 0,
     qualificados: 0,
     agendados: 0,
-    fechados: 0
-  });
+    fechados: 0,
+    novosLeads: 0
+  };
+
+  const schoolLeads = user ? getLeadsBySchool(user.schoolId) : [];
 
   const statsDisplay = [
-    { label: 'Leads Capturados', value: stats.leadsCapturados, icon: Users, color: 'from-blue-500 to-blue-600' },
-    { label: 'Qualificados pela IA', value: stats.qualificadosIA, icon: MessageSquare, color: 'from-blue-600 to-blue-700' },
-    { label: 'Reuniões Agendadas', value: stats.reunioesAgendadas, icon: Calendar, color: 'from-blue-700 to-blue-800' },
-    { label: 'Enviados WhatsApp', value: stats.enviadosWhatsApp, icon: Send, color: 'from-blue-800 to-blue-900' },
+    { label: 'Leads Capturados', value: stats.leadsHoje, icon: Users, color: 'from-blue-500 to-blue-600' },
+    { label: 'Qualificados pela IA', value: stats.qualificados, icon: MessageSquare, color: 'from-blue-600 to-blue-700' },
+    { label: 'Reuniões Agendadas', value: stats.agendados, icon: Calendar, color: 'from-blue-700 to-blue-800' },
+    { label: 'Matriculados', value: stats.fechados, icon: Send, color: 'from-blue-800 to-blue-900' },
   ];
 
-  const pipelineData = [
-    { stage: 'Novos Leads', count: pipeline.novosLeads, color: 'bg-blue-500', progress: pipeline.novosLeads > 0 ? (pipeline.novosLeads / (pipeline.novosLeads + pipeline.qualificados + pipeline.agendados + pipeline.fechados)) * 100 : 0 },
-    { stage: 'Qualificados', count: pipeline.qualificados, color: 'bg-blue-600', progress: pipeline.qualificados > 0 ? (pipeline.qualificados / (pipeline.novosLeads + pipeline.qualificados + pipeline.agendados + pipeline.fechados)) * 100 : 0 },
-    { stage: 'Agendados', count: pipeline.agendados, color: 'bg-blue-700', progress: pipeline.agendados > 0 ? (pipeline.agendados / (pipeline.novosLeads + pipeline.qualificados + pipeline.agendados + pipeline.fechados)) * 100 : 0 },
-    { stage: 'Fechados', count: pipeline.fechados, color: 'bg-blue-800', progress: pipeline.fechados > 0 ? (pipeline.fechados / (pipeline.novosLeads + pipeline.qualificados + pipeline.agendados + pipeline.fechados)) * 100 : 0 },
+  // Organizar leads por estágio
+  const leadsByStage = {
+    novo: schoolLeads.filter(lead => lead.status === 'novo'),
+    qualificado: schoolLeads.filter(lead => lead.status === 'qualificado'),
+    agendado: schoolLeads.filter(lead => lead.status === 'agendado'),
+    matriculado: schoolLeads.filter(lead => lead.status === 'fechado')
+  };
+
+  const pipelineStages = [
+    { 
+      id: 'novo',
+      stage: 'Novos Leads', 
+      leads: leadsByStage.novo,
+      color: 'bg-blue-500',
+      borderColor: 'border-blue-500',
+      textColor: 'text-blue-600'
+    },
+    { 
+      id: 'qualificado',
+      stage: 'Qualificados', 
+      leads: leadsByStage.qualificado,
+      color: 'bg-green-500',
+      borderColor: 'border-green-500',
+      textColor: 'text-green-600'
+    },
+    { 
+      id: 'agendado',
+      stage: 'Agendados', 
+      leads: leadsByStage.agendado,
+      color: 'bg-yellow-500',
+      borderColor: 'border-yellow-500',
+      textColor: 'text-yellow-600'
+    },
+    { 
+      id: 'matriculado',
+      stage: 'Matriculados', 
+      leads: leadsByStage.matriculado,
+      color: 'bg-purple-500',
+      borderColor: 'border-purple-500',
+      textColor: 'text-purple-600'
+    },
   ];
+
+  // Função para mover lead entre estágios
+  const moveLeadToStage = async (leadId: string, newStatus: Lead['status']) => {
+    if (user) {
+      await updateLead(leadId, { status: newStatus });
+    }
+  };
+
+  // Função para mover lead para estágio anterior
+  const moveLeadToPreviousStage = async (leadId: string, currentStatus: Lead['status']) => {
+    if (user) {
+      let previousStatus: Lead['status'];
+      switch (currentStatus) {
+        case 'fechado':
+          previousStatus = 'agendado';
+          break;
+        case 'agendado':
+          previousStatus = 'qualificado';
+          break;
+        case 'qualificado':
+          previousStatus = 'novo';
+          break;
+        default:
+          return; // Não há estágio anterior para 'novo'
+      }
+      await updateLead(leadId, { status: previousStatus });
+    }
+  };
+
+  // Função para formatar data
+  const formatDate = (date: Date) => {
+    return new Date(date).toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit'
+    });
+  };
+
+  // Função para obter cor do método
+  const getMethodColor = (method: string) => {
+    const colors = {
+      'adults': 'bg-blue-100 text-blue-800',
+      'teens': 'bg-green-100 text-green-800',
+      'kids': 'bg-yellow-100 text-yellow-800',
+      'practice-progress': 'bg-purple-100 text-purple-800',
+      'on-demand': 'bg-gray-100 text-gray-800'
+    };
+    return colors[method as keyof typeof colors] || 'bg-gray-100 text-gray-800';
+  };
+
+  // Função para obter label do método
+  const getMethodLabel = (method: string) => {
+    const labels = {
+      'adults': 'Adults',
+      'teens': 'Teens',
+      'kids': 'Kids',
+      'practice-progress': 'P&P',
+      'on-demand': 'On Demand'
+    };
+    return labels[method as keyof typeof labels] || method;
+  };
 
   const container = {
     hidden: { opacity: 0 },
@@ -115,7 +214,7 @@ export const DashboardOverview = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className={isMobile ? 'p-4 pt-2' : ''}>
-            {pipeline.novosLeads === 0 && pipeline.qualificados === 0 && pipeline.agendados === 0 && pipeline.fechados === 0 ? (
+            {schoolLeads.length === 0 ? (
               <div className={`text-center ${isMobile ? 'py-6' : 'py-8'}`}>
                 <p className={`text-slate-400 ${
                   isMobile ? 'text-base' : 'text-lg'
@@ -131,34 +230,178 @@ export const DashboardOverview = () => {
             ) : (
               <div className={`grid ${
                 isMobile 
-                  ? 'grid-cols-2 gap-4' 
-                  : 'grid-cols-1 md:grid-cols-4 gap-6'
-              }`}>
-                {pipelineData.map((stage, index) => (
-                  <motion.div 
-                    key={index} 
-                    className={`text-center ${
-                      isMobile ? 'space-y-2' : 'space-y-3'
-                    }`}
-                    whileHover={isMobile ? {} : { scale: 1.05 }}
-                    transition={{ type: "spring", stiffness: 300 }}
-                  >
-                    <div className={`${
-                      isMobile ? 'w-12 h-12' : 'w-16 h-16'
-                    } ${stage.color} rounded-full flex items-center justify-center mx-auto mb-2 shadow-lg hover:shadow-xl transition-shadow duration-300`}>
-                      <span className={`text-white font-bold ${
-                        isMobile ? 'text-base' : 'text-lg'
+                  ? 'grid-cols-1 gap-4' 
+                  : 'grid-cols-4 gap-6'
+              } min-h-[400px]`}>
+                {pipelineStages.map((stage, stageIndex) => (
+                  <div key={stage.id} className="space-y-3">
+                    {/* Header da coluna */}
+                    <div className={`flex items-center justify-between p-3 rounded-lg border-2 ${stage.borderColor} bg-slate-700/30`}>
+                      <h3 className={`font-semibold ${stage.textColor} ${
+                        isMobile ? 'text-sm' : 'text-base'
                       }`}>
-                        {stage.count}
-                      </span>
+                        {stage.stage}
+                      </h3>
+                      <Badge variant="secondary" className={`${stage.color} text-white ${
+                        isMobile ? 'text-xs' : 'text-sm'
+                      }`}>
+                        {stage.leads.length}
+                      </Badge>
                     </div>
-                    <p className={`text-slate-300 font-medium ${
-                      isMobile ? 'text-xs' : ''
-                    }`}>
-                      {stage.stage}
-                    </p>
-                    <Progress value={stage.progress} className="h-2" />
-                  </motion.div>
+
+                    {/* Cards dos leads */}
+                    <div className="space-y-3 max-h-[500px] overflow-y-auto">
+                      {stage.leads.length === 0 ? (
+                        <div className={`text-center py-4 text-slate-500 ${
+                          isMobile ? 'text-xs' : 'text-sm'
+                        }`}>
+                          Nenhum lead neste estágio
+                        </div>
+                      ) : (
+                        stage.leads.map((lead, leadIndex) => (
+                          <motion.div
+                            key={lead.id}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: leadIndex * 0.1 }}
+                          >
+                            <Card className="bg-slate-700/50 border-slate-600 hover:bg-slate-700/70 transition-all duration-200 cursor-pointer group">
+                              <CardContent className={`${isMobile ? 'p-3' : 'p-4'}`}>
+                                <div className="space-y-2">
+                                  {/* Nome e método */}
+                                  <div className="flex items-center justify-between">
+                                    <h4 className={`font-semibold text-white truncate ${
+                                      isMobile ? 'text-sm' : 'text-base'
+                                    }`}>
+                                      {lead.name}
+                                    </h4>
+                                    <Badge className={`${getMethodColor(lead.method)} ${
+                                      isMobile ? 'text-xs px-1' : 'text-xs'
+                                    }`}>
+                                      {getMethodLabel(lead.method)}
+                                    </Badge>
+                                  </div>
+
+                                  {/* Email e telefone */}
+                                  <div className="space-y-1">
+                                    <div className="flex items-center space-x-2">
+                                      <Mail className="text-slate-400" size={isMobile ? 12 : 14} />
+                                      <span className={`text-slate-300 truncate ${
+                                        isMobile ? 'text-xs' : 'text-sm'
+                                      }`}>
+                                        {lead.email}
+                                      </span>
+                                    </div>
+                                    {lead.phone && (
+                                      <div className="flex items-center space-x-2">
+                                        <Phone className="text-slate-400" size={isMobile ? 12 : 14} />
+                                        <span className={`text-slate-300 ${
+                                          isMobile ? 'text-xs' : 'text-sm'
+                                        }`}>
+                                          {lead.phone}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Modalidade e data */}
+                                  <div className="flex items-center justify-between">
+                                    <Badge variant="outline" className={`text-slate-300 border-slate-500 ${
+                                      isMobile ? 'text-xs' : 'text-xs'
+                                    }`}>
+                                      {lead.modality === 'presencial' ? 'Presencial' : 'Live'}
+                                    </Badge>
+                                    <div className="flex items-center space-x-1">
+                                      <Clock className="text-slate-400" size={isMobile ? 10 : 12} />
+                                      <span className={`text-slate-400 ${
+                                        isMobile ? 'text-xs' : 'text-xs'
+                                      }`}>
+                                        {formatDate(lead.createdAt)}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  {/* Score se houver */}
+                                  {lead.score > 0 && (
+                                    <div className="flex items-center justify-between">
+                                      <span className={`text-slate-400 ${
+                                        isMobile ? 'text-xs' : 'text-sm'
+                                      }`}>
+                                        Score:
+                                      </span>
+                                      <Badge className={`${
+                                        lead.score >= 80 ? 'bg-green-500' :
+                                        lead.score >= 60 ? 'bg-yellow-500' :
+                                        'bg-red-500'
+                                      } text-white`}>
+                                        {lead.score}
+                                      </Badge>
+                                    </div>
+                                  )}
+
+                                  {/* Botões de ação */}
+                                  <div className={`flex items-center justify-between pt-2`}>
+                                    {/* Ícone para voltar ao estágio anterior */}
+                                    {stage.id !== 'novo' ? (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => moveLeadToPreviousStage(lead.id, lead.status)}
+                                        className="p-1 h-6 w-6 text-slate-400 hover:text-white hover:bg-slate-600"
+                                      >
+                                        <ArrowLeft size={14} />
+                                      </Button>
+                                    ) : (
+                                      <div className="w-6"></div>
+                                    )}
+                                    
+                                    {/* Botões para avançar */}
+                                    <div className={`flex ${
+                                      isMobile ? 'flex-col space-y-1' : 'space-x-2'
+                                    }`}>
+                                      {stage.id === 'novo' && (
+                                        <Button
+                                          size="sm"
+                                          onClick={() => moveLeadToStage(lead.id, 'qualificado')}
+                                          className={`bg-green-600 hover:bg-green-700 text-white ${
+                                            isMobile ? 'text-xs h-7' : 'text-xs'
+                                          }`}
+                                        >
+                                          Qualificar
+                                        </Button>
+                                      )}
+                                      {stage.id === 'qualificado' && (
+                                        <Button
+                                          size="sm"
+                                          onClick={() => moveLeadToStage(lead.id, 'agendado')}
+                                          className={`bg-yellow-600 hover:bg-yellow-700 text-white ${
+                                            isMobile ? 'text-xs h-7' : 'text-xs'
+                                          }`}
+                                        >
+                                          Agendar
+                                        </Button>
+                                      )}
+                                      {stage.id === 'agendado' && (
+                                        <Button
+                                          size="sm"
+                                          onClick={() => moveLeadToStage(lead.id, 'fechado')}
+                                          className={`bg-purple-600 hover:bg-purple-700 text-white ${
+                                            isMobile ? 'text-xs h-7' : 'text-xs'
+                                          }`}
+                                        >
+                                          Matricular
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          </motion.div>
+                        ))
+                      )}
+                    </div>
+                  </div>
                 ))}
               </div>
             )}
@@ -186,13 +429,17 @@ export const DashboardOverview = () => {
               <div className={`flex ${
                 isMobile ? 'flex-col space-y-2' : 'space-x-3'
               }`}>
-                <Button className={`${
-                  isMobile ? 'w-full' : ''
-                } bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800`}>
+                <Button 
+                  onClick={() => onNavigate?.('leads')}
+                  className={`${
+                    isMobile ? 'w-full' : ''
+                  } bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800`}
+                >
                   <Plus className="mr-2" size={18} />
                   Capturar Primeiro Lead
                 </Button>
                 <Button 
+                  onClick={() => onNavigate?.('admin')}
                   variant="outline" 
                   className={`${
                     isMobile ? 'w-full' : ''

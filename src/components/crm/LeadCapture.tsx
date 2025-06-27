@@ -6,14 +6,18 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { UserPlus, Globe, Facebook, Instagram, Linkedin, Mail, Phone, MapPin, Building } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { UserPlus, Globe, Facebook, Instagram, Linkedin, Mail, Phone, MapPin, Building, GraduationCap, Users } from 'lucide-react';
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useAuth } from '@/contexts/AuthContext';
 
 export const LeadCapture = () => {
   const isMobile = useIsMobile();
+  const { toast } = useToast();
+  const { user, registerLead, getLeadsBySchool, getLeadStats, getLeadSourcesBySchool } = useAuth();
   
   const [formData, setFormData] = useState({
     name: '',
@@ -22,20 +26,29 @@ export const LeadCapture = () => {
     company: '',
     position: '',
     interests: '',
-    source: 'website'
+    source: 'website',
+    method: '', // Adults, Teens, Kids, Practice & Progress, On Demand
+    modality: '', // Presencial ou Live
+    age: '',
+    experience: '',
+    availability: '',
+    budget: '',
+    goals: ''
   });
 
   const [autoQualification, setAutoQualification] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
-  const [leads, setLeads] = useState<any[]>([]);
-  const [stats, setStats] = useState({
+
+  // Obter dados do contexto
+  const schoolLeads = user ? getLeadsBySchool(user.schoolId) : [];
+  const stats = user ? getLeadStats(user.schoolId) : {
     leadsHoje: 0,
     qualificados: 0,
     agendados: 0,
-    fechados: 0
-  });
-
-  const { toast } = useToast();
+    fechados: 0,
+    novosLeads: 0
+  };
+  const schoolLeadSources = user ? getLeadSourcesBySchool(user.schoolId) : [];
 
   const sources = [
     { id: 'website', name: 'Website', icon: Globe, count: 0, color: 'bg-blue-500' },
@@ -44,13 +57,27 @@ export const LeadCapture = () => {
     { id: 'linkedin', name: 'LinkedIn', icon: Linkedin, count: 0, color: 'bg-blue-800' },
   ];
 
+  // Opções específicas da Rockfeller
+  const teachingMethods = [
+    { value: 'adults', label: 'Adults' },
+    { value: 'teens', label: 'Teens' },
+    { value: 'kids', label: 'Kids' },
+    { value: 'practice-progress', label: 'Practice & Progress' },
+    { value: 'on-demand', label: 'On Demand' }
+  ];
+
+  const modalities = [
+    { value: 'presencial', label: 'Presencial' },
+    { value: 'live', label: 'Live' }
+  ];
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name || !formData.email) {
+    if (!formData.name || !formData.email || !formData.method || !formData.modality || !user) {
       toast({
         title: "Erro",
-        description: "Preencha pelo menos nome e e-mail",
+        description: "Preencha os campos obrigatórios: Nome, E-mail, Método e Modalidade",
         variant: "destructive",
       });
       return;
@@ -59,41 +86,42 @@ export const LeadCapture = () => {
     setIsLoading(true);
 
     try {
-      // Criar novo lead
-      const newLead = {
-        id: Date.now().toString(),
+      // Criar novo lead usando o contexto
+      const leadData = {
         ...formData,
-        timestamp: new Date().toISOString(),
         score: 0,
-        status: 'novo'
+        status: 'novo' as const,
+        schoolId: user.schoolId
       };
 
-      // Adicionar à lista de leads
-      setLeads(prev => [newLead, ...prev]);
+      const success = await registerLead(leadData);
       
-      // Atualizar estatísticas
-      setStats(prev => ({
-        ...prev,
-        leadsHoje: prev.leadsHoje + 1
-      }));
+      if (success) {
+        // Limpar formulário
+        setFormData({
+          name: '',
+          email: '',
+          phone: '',
+          company: '',
+          position: '',
+          interests: '',
+          source: 'website',
+          method: '',
+          modality: '',
+          age: '',
+          experience: '',
+          availability: '',
+          budget: '',
+          goals: ''
+        });
 
-      // Limpar formulário
-      setFormData({
-        name: '',
-        email: '',
-        phone: '',
-        company: '',
-        position: '',
-        interests: '',
-        source: 'website'
-      });
-
-      toast({
-        title: "Lead Capturado!",
-        description: `Lead ${newLead.name} foi adicionado com sucesso`,
-      });
-
-      console.log('Lead capturado:', newLead);
+        toast({
+          title: "Lead Capturado!",
+          description: `Lead ${leadData.name} foi adicionado com sucesso`,
+        });
+      } else {
+        throw new Error('Falha ao registrar lead');
+      }
 
     } catch (error) {
       console.error('Erro ao capturar lead:', error);
@@ -170,102 +198,235 @@ export const LeadCapture = () => {
                     isMobile ? 'text-lg' : ''
                   }`}>
                     <UserPlus className="mr-2" size={isMobile ? 18 : 20} />
-                    Novo Lead
+                    Novo Lead - Rockfeller
                   </CardTitle>
                 </CardHeader>
                 <CardContent className={isMobile ? 'p-4 pt-2' : ''}>
                   <form onSubmit={handleSubmit} className={`space-y-${isMobile ? '3' : '4'}`}>
-                    <div className={`grid ${
-                      isMobile ? 'grid-cols-1 gap-3' : 'grid-cols-2 gap-4'
-                    }`}>
-                      <div className="space-y-2">
-                        <Label htmlFor="name" className={`text-slate-300 ${
-                          isMobile ? 'text-sm' : ''
-                        }`}>
-                          Nome *
-                        </Label>
-                        <Input
-                          id="name"
-                          value={formData.name}
-                          onChange={(e) => setFormData({...formData, name: e.target.value})}
-                          className={`bg-slate-700/50 border-slate-600 text-white ${
-                            isMobile ? 'h-12' : ''
-                          }`}
-                          placeholder="Nome completo"
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="email" className={`text-slate-300 ${
-                          isMobile ? 'text-sm' : ''
-                        }`}>
-                          E-mail *
-                        </Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          value={formData.email}
-                          onChange={(e) => setFormData({...formData, email: e.target.value})}
-                          className={`bg-slate-700/50 border-slate-600 text-white ${
-                            isMobile ? 'h-12' : ''
-                          }`}
-                          placeholder="email@exemplo.com"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div className={`grid ${
-                      isMobile ? 'grid-cols-1 gap-3' : 'grid-cols-2 gap-4'
-                    }`}>
-                      <div className="space-y-2">
-                        <Label htmlFor="phone" className={`text-slate-300 ${
-                          isMobile ? 'text-sm' : ''
-                        }`}>
-                          Telefone
-                        </Label>
-                        <Input
-                          id="phone"
-                          value={formData.phone}
-                          onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                          className={`bg-slate-700/50 border-slate-600 text-white ${
-                            isMobile ? 'h-12' : ''
-                          }`}
-                          placeholder="(11) 99999-9999"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="company" className={`text-slate-300 ${
-                          isMobile ? 'text-sm' : ''
-                        }`}>
-                          Empresa
-                        </Label>
-                        <Input
-                          id="company"
-                          value={formData.company}
-                          onChange={(e) => setFormData({...formData, company: e.target.value})}
-                          className={`bg-slate-700/50 border-slate-600 text-white ${
-                            isMobile ? 'h-12' : ''
-                          }`}
-                          placeholder="Nome da empresa"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="interests" className={`text-slate-300 ${
-                        isMobile ? 'text-sm' : ''
+                    {/* Dados Pessoais */}
+                    <div className="space-y-3">
+                      <h3 className="text-white font-semibold flex items-center">
+                        <Users className="mr-2" size={16} />
+                        Dados Pessoais
+                      </h3>
+                      <div className={`grid ${
+                        isMobile ? 'grid-cols-1 gap-3' : 'grid-cols-2 gap-4'
                       }`}>
-                        Interesses
-                      </Label>
-                      <Textarea
-                        id="interests"
-                        value={formData.interests}
-                        onChange={(e) => setFormData({...formData, interests: e.target.value})}
-                        className="bg-slate-700/50 border-slate-600 text-white"
-                        placeholder="Descreva os interesses do lead..."
-                        rows={isMobile ? 2 : 3}
-                      />
+                        <div className="space-y-2">
+                          <Label htmlFor="name" className={`text-slate-300 ${
+                            isMobile ? 'text-sm' : ''
+                          }`}>
+                            Nome *
+                          </Label>
+                          <Input
+                            id="name"
+                            value={formData.name}
+                            onChange={(e) => setFormData({...formData, name: e.target.value})}
+                            className={`bg-slate-700/50 border-slate-600 text-white ${
+                              isMobile ? 'h-12' : ''
+                            }`}
+                            placeholder="Nome completo"
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="email" className={`text-slate-300 ${
+                            isMobile ? 'text-sm' : ''
+                          }`}>
+                            E-mail *
+                          </Label>
+                          <Input
+                            id="email"
+                            type="email"
+                            value={formData.email}
+                            onChange={(e) => setFormData({...formData, email: e.target.value})}
+                            className={`bg-slate-700/50 border-slate-600 text-white ${
+                              isMobile ? 'h-12' : ''
+                            }`}
+                            placeholder="email@exemplo.com"
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="phone" className={`text-slate-300 ${
+                            isMobile ? 'text-sm' : ''
+                          }`}>
+                            Telefone
+                          </Label>
+                          <Input
+                            id="phone"
+                            value={formData.phone}
+                            onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                            className={`bg-slate-700/50 border-slate-600 text-white ${
+                              isMobile ? 'h-12' : ''
+                            }`}
+                            placeholder="(11) 99999-9999"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="age" className={`text-slate-300 ${
+                            isMobile ? 'text-sm' : ''
+                          }`}>
+                            Idade
+                          </Label>
+                          <Input
+                            id="age"
+                            value={formData.age}
+                            onChange={(e) => setFormData({...formData, age: e.target.value})}
+                            className={`bg-slate-700/50 border-slate-600 text-white ${
+                              isMobile ? 'h-12' : ''
+                            }`}
+                            placeholder="Ex: 25 anos"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Informações do Curso */}
+                    <div className="space-y-3">
+                      <h3 className="text-white font-semibold flex items-center">
+                        <GraduationCap className="mr-2" size={16} />
+                        Informações do Curso
+                      </h3>
+                      <div className={`grid ${
+                        isMobile ? 'grid-cols-1 gap-3' : 'grid-cols-2 gap-4'
+                      }`}>
+                        <div className="space-y-2">
+                          <Label htmlFor="method" className={`text-slate-300 ${
+                            isMobile ? 'text-sm' : ''
+                          }`}>
+                            Método *
+                          </Label>
+                          <Select value={formData.method} onValueChange={(value) => setFormData({...formData, method: value})}>
+                            <SelectTrigger className={`bg-slate-700/50 border-slate-600 text-white ${
+                              isMobile ? 'h-12' : ''
+                            }`}>
+                              <SelectValue placeholder="Selecione o método" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-slate-700 border-slate-600">
+                              {teachingMethods.map((method) => (
+                                <SelectItem key={method.value} value={method.value} className="text-white hover:bg-slate-600">
+                                  {method.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="modality" className={`text-slate-300 ${
+                            isMobile ? 'text-sm' : ''
+                          }`}>
+                            Modalidade *
+                          </Label>
+                          <Select value={formData.modality} onValueChange={(value) => setFormData({...formData, modality: value})}>
+                            <SelectTrigger className={`bg-slate-700/50 border-slate-600 text-white ${
+                              isMobile ? 'h-12' : ''
+                            }`}>
+                              <SelectValue placeholder="Selecione a modalidade" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-slate-700 border-slate-600">
+                              {modalities.map((modality) => (
+                                <SelectItem key={modality.value} value={modality.value} className="text-white hover:bg-slate-600">
+                                  {modality.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="experience" className={`text-slate-300 ${
+                            isMobile ? 'text-sm' : ''
+                          }`}>
+                            Experiência com Inglês
+                          </Label>
+                          <Input
+                            id="experience"
+                            value={formData.experience}
+                            onChange={(e) => setFormData({...formData, experience: e.target.value})}
+                            className={`bg-slate-700/50 border-slate-600 text-white ${
+                              isMobile ? 'h-12' : ''
+                            }`}
+                            placeholder="Ex: Básico, Intermediário, Avançado"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="availability" className={`text-slate-300 ${
+                            isMobile ? 'text-sm' : ''
+                          }`}>
+                            Disponibilidade
+                          </Label>
+                          <Input
+                            id="availability"
+                            value={formData.availability}
+                            onChange={(e) => setFormData({...formData, availability: e.target.value})}
+                            className={`bg-slate-700/50 border-slate-600 text-white ${
+                              isMobile ? 'h-12' : ''
+                            }`}
+                            placeholder="Ex: Manhã, Tarde, Noite"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Informações Adicionais */}
+                    <div className="space-y-3">
+                      <div className={`grid ${
+                        isMobile ? 'grid-cols-1 gap-3' : 'grid-cols-2 gap-4'
+                      }`}>
+                        <div className="space-y-2">
+                          <Label htmlFor="budget" className={`text-slate-300 ${
+                            isMobile ? 'text-sm' : ''
+                          }`}>
+                            Orçamento Mensal
+                          </Label>
+                          <Input
+                            id="budget"
+                            value={formData.budget}
+                            onChange={(e) => setFormData({...formData, budget: e.target.value})}
+                            className={`bg-slate-700/50 border-slate-600 text-white ${
+                              isMobile ? 'h-12' : ''
+                            }`}
+                            placeholder="Ex: R$ 500,00"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="source" className={`text-slate-300 ${
+                            isMobile ? 'text-sm' : ''
+                          }`}>
+                            Fonte
+                          </Label>
+                          <Select value={formData.source} onValueChange={(value) => setFormData({...formData, source: value})}>
+                            <SelectTrigger className={`bg-slate-700/50 border-slate-600 text-white ${
+                              isMobile ? 'h-12' : ''
+                            }`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-slate-700 border-slate-600">
+                              {sources.map((source) => (
+                                <SelectItem key={source.id} value={source.id} className="text-white hover:bg-slate-600">
+                                  {source.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="goals" className={`text-slate-300 ${
+                          isMobile ? 'text-sm' : ''
+                        }`}>
+                          Objetivos com o Inglês
+                        </Label>
+                        <Textarea
+                          id="goals"
+                          value={formData.goals}
+                          onChange={(e) => setFormData({...formData, goals: e.target.value})}
+                          className={`bg-slate-700/50 border-slate-600 text-white ${
+                            isMobile ? 'min-h-20' : 'min-h-24'
+                          }`}
+                          placeholder="Ex: Trabalho, viagem, estudos, hobby..."
+                        />
+                      </div>
                     </div>
 
                     <div className="flex items-center space-x-2">
@@ -455,7 +616,7 @@ export const LeadCapture = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className={isMobile ? 'p-4 pt-2' : ''}>
-              {leads.length === 0 ? (
+              {schoolLeads.length === 0 ? (
                 <div className={`text-center ${
                   isMobile ? 'py-6' : 'py-8'
                 }`}>
@@ -472,7 +633,7 @@ export const LeadCapture = () => {
                 </div>
               ) : (
                 <div className={`space-y-${isMobile ? '2' : '3'}`}>
-                  {leads.map((lead, index) => (
+                  {schoolLeads.map((lead, index) => (
                     <motion.div 
                       key={lead.id}
                       className={`${

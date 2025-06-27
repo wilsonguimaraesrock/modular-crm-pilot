@@ -21,6 +21,48 @@ export interface Seller {
   createdAt: Date;
 }
 
+export interface LeadSource {
+  id: string;
+  name: string;
+  type: 'form' | 'integration';
+  icon: string; // Nome do ícone
+  active: boolean;
+  url: string;
+  description: string;
+  fields: string[];
+  autoAssign: string;
+  notifications: boolean;
+  webhookUrl: string;
+  leadsCount: number;
+  schoolId: string; // Nova propriedade para vincular à escola
+  createdAt: Date;
+}
+
+export interface Lead {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  company?: string;
+  position?: string;
+  interests?: string;
+  source: string;
+  method: string; // Adults, Teens, Kids, Practice & Progress, On Demand
+  modality: string; // Presencial ou Live
+  age?: string;
+  experience?: string;
+  availability?: string;
+  budget?: string;
+  goals?: string;
+  score: number;
+  status: 'novo' | 'qualificado' | 'agendado' | 'fechado' | 'perdido';
+  schoolId: string;
+  assignedTo?: string; // ID do vendedor
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface AuthUser {
   id: string;
   name: string;
@@ -35,6 +77,8 @@ interface AuthContextType {
   user: AuthUser | null;
   schools: School[];
   sellers: Seller[];
+  leadSources: LeadSource[];
+  leads: Lead[];
   currentSchool: School | null;
   isLoading: boolean;
   
@@ -53,6 +97,29 @@ interface AuthContextType {
   updateSeller: (id: string, data: Partial<Seller>) => Promise<boolean>;
   deleteSeller: (id: string) => Promise<boolean>;
   getSellersBySchool: (schoolId: string) => Seller[];
+  
+  // Lead Sources functions
+  registerLeadSource: (data: Omit<LeadSource, 'id' | 'createdAt'>) => Promise<boolean>;
+  updateLeadSource: (id: string, data: Partial<LeadSource>) => Promise<boolean>;
+  deleteLeadSource: (id: string) => Promise<boolean>;
+  getLeadSourcesBySchool: (schoolId: string) => LeadSource[];
+  toggleLeadSource: (id: string) => Promise<boolean>;
+  
+  // Lead functions
+  registerLead: (data: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>) => Promise<boolean>;
+  updateLead: (id: string, data: Partial<Lead>) => Promise<boolean>;
+  deleteLead: (id: string) => Promise<boolean>;
+  getLeadsBySchool: (schoolId: string) => Lead[];
+  getLeadStats: (schoolId: string) => {
+    leadsHoje: number;
+    qualificados: number;
+    agendados: number;
+    fechados: number;
+    novosLeads: number;
+  };
+  
+  // Lead distribution functions
+  getNextAvailableSeller: (schoolId: string) => Seller | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -63,66 +130,134 @@ const MOCK_SCHOOLS: School[] = [
     id: '1',
     name: 'Escola Rockfeller Sede',
     email: 'admin@rockfeller.com.br',
-    phone: '+55 11 9999-9999',
-    address: 'Av. Paulista, 1000 - São Paulo/SP',
-    createdAt: new Date('2024-01-01')
-  },
-  {
-    id: '2',
-    name: 'Escola Rockfeller Filial Norte',
-    email: 'norte@rockfeller.com.br',
-    phone: '+55 11 8888-8888',
-    address: 'Rua Augusta, 500 - São Paulo/SP',
-    createdAt: new Date('2024-02-01')
+    phone: '',
+    address: '',
+    createdAt: new Date()
   }
 ];
 
-const MOCK_SELLERS: Seller[] = [
+const MOCK_SELLERS: Seller[] = [];
+
+// Fontes de leads padrão (será criada uma cópia para cada escola)
+const DEFAULT_LEAD_SOURCES = [
   {
-    id: '1',
-    name: 'Carlos Silva',
-    email: 'carlos@rockfeller.com.br',
-    phone: '+55 11 99999-1111',
-    role: 'Vendedor Senior',
-    schoolId: '1',
-    active: true,
-    createdAt: new Date('2024-01-15')
+    name: 'Website',
+    type: 'form' as const,
+    icon: 'Globe',
+    active: false,
+    url: '',
+    description: 'Formulário de contato do website principal',
+    fields: ['name', 'email', 'phone', 'message'],
+    autoAssign: '',
+    notifications: true,
+    webhookUrl: '',
+    leadsCount: 0
   },
   {
-    id: '2',
-    name: 'Ana Santos',
-    email: 'ana@rockfeller.com.br',
-    phone: '+55 11 99999-2222',
-    role: 'Vendedora Pleno',
-    schoolId: '1',
-    active: true,
-    createdAt: new Date('2024-01-20')
+    name: 'Facebook Ads',
+    type: 'integration' as const,
+    icon: 'Facebook',
+    active: false,
+    url: '',
+    description: 'Integração com Facebook Lead Ads',
+    fields: ['name', 'email', 'phone'],
+    autoAssign: '',
+    notifications: true,
+    webhookUrl: '',
+    leadsCount: 0
   },
   {
-    id: '3',
-    name: 'Pedro Costa',
-    email: 'pedro@rockfeller-norte.com.br',
-    phone: '+55 11 99999-3333',
-    role: 'Vendedor Junior',
-    schoolId: '2',
-    active: true,
-    createdAt: new Date('2024-02-10')
+    name: 'Instagram',
+    type: 'integration' as const,
+    icon: 'Instagram',
+    active: false,
+    url: '',
+    description: 'Integração com Instagram Business',
+    fields: ['name', 'email'],
+    autoAssign: '',
+    notifications: false,
+    webhookUrl: '',
+    leadsCount: 0
+  },
+  {
+    name: 'LinkedIn',
+    type: 'integration' as const,
+    icon: 'Linkedin',
+    active: false,
+    url: '',
+    description: 'Integração com LinkedIn Lead Gen Forms',
+    fields: ['name', 'email', 'company', 'position'],
+    autoAssign: '',
+    notifications: true,
+    webhookUrl: '',
+    leadsCount: 0
   }
 ];
 
-// Senhas mock (em produção, usar hash/criptografia)
-const MOCK_PASSWORDS: Record<string, string> = {
-  'admin@rockfeller.com.br': 'admin123',
-  'norte@rockfeller.com.br': 'norte123',
-  'carlos@rockfeller.com.br': 'carlos123',
-  'ana@rockfeller.com.br': 'ana123',
-  'pedro@rockfeller-norte.com.br': 'pedro123'
+// Criar fontes padrão para a escola sede (ID = '1')
+const createSedeLeadSources = (): LeadSource[] => {
+  return DEFAULT_LEAD_SOURCES.map((source, index) => ({
+    ...source,
+    id: `1_${source.name.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}${index}`,
+    schoolId: '1',
+    createdAt: new Date()
+  }));
+};
+
+const MOCK_LEAD_SOURCES: LeadSource[] = createSedeLeadSources();
+
+// Função para obter senhas do localStorage (em produção, usar hash/criptografia)
+const getMockPasswords = (): Record<string, string> => {
+  const defaultPasswords = { 'admin@rockfeller.com.br': 'admin123' };
+  try {
+    const savedPasswords = localStorage.getItem('mock_passwords');
+    if (savedPasswords) {
+      return { ...defaultPasswords, ...JSON.parse(savedPasswords) };
+    }
+  } catch (error) {
+    console.error('Erro ao recuperar senhas:', error);
+  }
+  return defaultPasswords;
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [schools, setSchools] = useState<School[]>(MOCK_SCHOOLS);
-  const [sellers, setSellers] = useState<Seller[]>(MOCK_SELLERS);
+  const [schools, setSchools] = useState<School[]>(() => {
+    try {
+      const savedSchools = localStorage.getItem('crm_schools');
+      return savedSchools ? JSON.parse(savedSchools) : MOCK_SCHOOLS;
+    } catch (error) {
+      console.error('Erro ao recuperar escolas:', error);
+      return MOCK_SCHOOLS;
+    }
+  });
+  const [sellers, setSellers] = useState<Seller[]>(() => {
+    try {
+      const savedSellers = localStorage.getItem('crm_sellers');
+      return savedSellers ? JSON.parse(savedSellers) : MOCK_SELLERS;
+    } catch (error) {
+      console.error('Erro ao recuperar vendedores:', error);
+      return MOCK_SELLERS;
+    }
+  });
+  const [leadSources, setLeadSources] = useState<LeadSource[]>(() => {
+    try {
+      const savedLeadSources = localStorage.getItem('crm_lead_sources');
+      return savedLeadSources ? JSON.parse(savedLeadSources) : MOCK_LEAD_SOURCES;
+    } catch (error) {
+      console.error('Erro ao recuperar fontes de leads:', error);
+      return MOCK_LEAD_SOURCES;
+    }
+  });
+  const [leads, setLeads] = useState<Lead[]>(() => {
+    try {
+      const savedLeads = localStorage.getItem('crm_leads');
+      return savedLeads ? JSON.parse(savedLeads) : [];
+    } catch (error) {
+      console.error('Erro ao recuperar leads:', error);
+      return [];
+    }
+  });
   const [isLoading, setIsLoading] = useState(true);
 
   // Computed values
@@ -166,7 +301,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       const school = schools.find(s => s.email === email);
-      if (!school || MOCK_PASSWORDS[email] !== password) {
+      const passwords = getMockPasswords();
+      if (!school || passwords[email] !== password) {
         return false;
       }
 
@@ -198,7 +334,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       const seller = sellers.find(s => s.email === email && s.active);
-      if (!seller || MOCK_PASSWORDS[email] !== password) {
+      const passwords = getMockPasswords();
+      if (!seller || passwords[email] !== password) {
         return false;
       }
 
@@ -246,7 +383,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         createdAt: new Date()
       };
 
-      setSchools(prev => [...prev, newSchool]);
+      const updatedSchools = [...schools, newSchool];
+      setSchools(updatedSchools);
+      
+      // Criar fontes de leads padrão para a nova escola
+      const defaultSources = createDefaultLeadSources(newSchool.id);
+      const updatedLeadSources = [...leadSources, ...defaultSources];
+      setLeadSources(updatedLeadSources);
+      
+      // Salvar no localStorage
+      localStorage.setItem('crm_schools', JSON.stringify(updatedSchools));
+      localStorage.setItem('crm_lead_sources', JSON.stringify(updatedLeadSources));
+      
       return true;
     } catch (error) {
       console.error('Erro ao cadastrar escola:', error);
@@ -256,7 +404,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateSchool = async (id: string, data: Partial<School>): Promise<boolean> => {
     try {
-      setSchools(prev => prev.map(s => s.id === id ? { ...s, ...data } : s));
+      const updatedSchools = schools.map(s => s.id === id ? { ...s, ...data } : s);
+      setSchools(updatedSchools);
+      localStorage.setItem('crm_schools', JSON.stringify(updatedSchools));
       return true;
     } catch (error) {
       console.error('Erro ao atualizar escola:', error);
@@ -266,8 +416,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const deleteSchool = async (id: string): Promise<boolean> => {
     try {
-      setSchools(prev => prev.filter(s => s.id !== id));
-      setSellers(prev => prev.filter(s => s.schoolId !== id));
+      const updatedSchools = schools.filter(s => s.id !== id);
+      const updatedSellers = sellers.filter(s => s.schoolId !== id);
+      const updatedLeadSources = leadSources.filter(ls => ls.schoolId !== id);
+      
+      setSchools(updatedSchools);
+      setSellers(updatedSellers);
+      setLeadSources(updatedLeadSources);
+      
+      localStorage.setItem('crm_schools', JSON.stringify(updatedSchools));
+      localStorage.setItem('crm_sellers', JSON.stringify(updatedSellers));
+      localStorage.setItem('crm_lead_sources', JSON.stringify(updatedLeadSources));
+      
       return true;
     } catch (error) {
       console.error('Erro ao deletar escola:', error);
@@ -288,7 +448,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         createdAt: new Date()
       };
 
-      setSellers(prev => [...prev, newSeller]);
+      const updatedSellers = [...sellers, newSeller];
+      setSellers(updatedSellers);
+      localStorage.setItem('crm_sellers', JSON.stringify(updatedSellers));
+      
       return true;
     } catch (error) {
       console.error('Erro ao cadastrar vendedor:', error);
@@ -298,7 +461,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateSeller = async (id: string, data: Partial<Seller>): Promise<boolean> => {
     try {
-      setSellers(prev => prev.map(s => s.id === id ? { ...s, ...data } : s));
+      const updatedSellers = sellers.map(s => s.id === id ? { ...s, ...data } : s);
+      setSellers(updatedSellers);
+      localStorage.setItem('crm_sellers', JSON.stringify(updatedSellers));
       return true;
     } catch (error) {
       console.error('Erro ao atualizar vendedor:', error);
@@ -308,7 +473,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const deleteSeller = async (id: string): Promise<boolean> => {
     try {
-      setSellers(prev => prev.filter(s => s.id !== id));
+      const updatedSellers = sellers.filter(s => s.id !== id);
+      setSellers(updatedSellers);
+      localStorage.setItem('crm_sellers', JSON.stringify(updatedSellers));
       return true;
     } catch (error) {
       console.error('Erro ao deletar vendedor:', error);
@@ -320,10 +487,193 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return sellers.filter(s => s.schoolId === schoolId);
   };
 
+  // Função para criar fontes padrão para uma nova escola
+  const createDefaultLeadSources = (schoolId: string): LeadSource[] => {
+    return DEFAULT_LEAD_SOURCES.map((source, index) => ({
+      ...source,
+      id: `${schoolId}_${source.name.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}${index}`,
+      schoolId,
+      createdAt: new Date()
+    }));
+  };
+
+  const registerLeadSource = async (data: Omit<LeadSource, 'id' | 'createdAt'>): Promise<boolean> => {
+    try {
+      const newLeadSource: LeadSource = {
+        ...data,
+        id: `${data.schoolId}_${data.name.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}`,
+        createdAt: new Date()
+      };
+
+      const updatedLeadSources = [...leadSources, newLeadSource];
+      setLeadSources(updatedLeadSources);
+      localStorage.setItem('crm_lead_sources', JSON.stringify(updatedLeadSources));
+      
+      return true;
+    } catch (error) {
+      console.error('Erro ao cadastrar fonte de lead:', error);
+      return false;
+    }
+  };
+
+  const updateLeadSource = async (id: string, data: Partial<LeadSource>): Promise<boolean> => {
+    try {
+      const updatedLeadSources = leadSources.map(ls => ls.id === id ? { ...ls, ...data } : ls);
+      setLeadSources(updatedLeadSources);
+      localStorage.setItem('crm_lead_sources', JSON.stringify(updatedLeadSources));
+      return true;
+    } catch (error) {
+      console.error('Erro ao atualizar fonte de lead:', error);
+      return false;
+    }
+  };
+
+  const deleteLeadSource = async (id: string): Promise<boolean> => {
+    try {
+      const updatedLeadSources = leadSources.filter(ls => ls.id !== id);
+      setLeadSources(updatedLeadSources);
+      localStorage.setItem('crm_lead_sources', JSON.stringify(updatedLeadSources));
+      return true;
+    } catch (error) {
+      console.error('Erro ao deletar fonte de lead:', error);
+      return false;
+    }
+  };
+
+  const getLeadSourcesBySchool = (schoolId: string): LeadSource[] => {
+    return leadSources.filter(ls => ls.schoolId === schoolId);
+  };
+
+  const toggleLeadSource = async (id: string): Promise<boolean> => {
+    try {
+      const updatedLeadSources = leadSources.map(ls => 
+        ls.id === id ? { ...ls, active: !ls.active } : ls
+      );
+      setLeadSources(updatedLeadSources);
+      localStorage.setItem('crm_lead_sources', JSON.stringify(updatedLeadSources));
+      return true;
+    } catch (error) {
+      console.error('Erro ao alternar fonte de lead:', error);
+      return false;
+    }
+  };
+
+  // Lead functions
+  const registerLead = async (data: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>): Promise<boolean> => {
+    try {
+      const newLead: Lead = {
+        ...data,
+        id: `lead_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      const updatedLeads = [...leads, newLead];
+      setLeads(updatedLeads);
+      localStorage.setItem('crm_leads', JSON.stringify(updatedLeads));
+      
+      // Atualizar contador da fonte de lead
+      const updatedLeadSources = leadSources.map(ls => 
+        ls.name.toLowerCase() === data.source.toLowerCase() && ls.schoolId === data.schoolId
+          ? { ...ls, leadsCount: ls.leadsCount + 1 }
+          : ls
+      );
+      setLeadSources(updatedLeadSources);
+      localStorage.setItem('crm_lead_sources', JSON.stringify(updatedLeadSources));
+      
+      return true;
+    } catch (error) {
+      console.error('Erro ao cadastrar lead:', error);
+      return false;
+    }
+  };
+
+  const updateLead = async (id: string, data: Partial<Lead>): Promise<boolean> => {
+    try {
+      const updatedLeads = leads.map(l => 
+        l.id === id ? { ...l, ...data, updatedAt: new Date() } : l
+      );
+      setLeads(updatedLeads);
+      localStorage.setItem('crm_leads', JSON.stringify(updatedLeads));
+      return true;
+    } catch (error) {
+      console.error('Erro ao atualizar lead:', error);
+      return false;
+    }
+  };
+
+  const deleteLead = async (id: string): Promise<boolean> => {
+    try {
+      const updatedLeads = leads.filter(l => l.id !== id);
+      setLeads(updatedLeads);
+      localStorage.setItem('crm_leads', JSON.stringify(updatedLeads));
+      return true;
+    } catch (error) {
+      console.error('Erro ao deletar lead:', error);
+      return false;
+    }
+  };
+
+  const getLeadsBySchool = (schoolId: string): Lead[] => {
+    return leads.filter(l => l.schoolId === schoolId);
+  };
+
+  const getLeadStats = (schoolId: string) => {
+    const schoolLeads = getLeadsBySchool(schoolId);
+    const today = new Date();
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    
+    const leadsHoje = schoolLeads.filter(l => 
+      new Date(l.createdAt) >= todayStart
+    ).length;
+    
+    const qualificados = schoolLeads.filter(l => l.status === 'qualificado').length;
+    const agendados = schoolLeads.filter(l => l.status === 'agendado').length;
+    const fechados = schoolLeads.filter(l => l.status === 'fechado').length;
+    const novosLeads = schoolLeads.filter(l => l.status === 'novo').length;
+    
+    return {
+      leadsHoje,
+      qualificados,
+      agendados,
+      fechados,
+      novosLeads
+    };
+  };
+
+  // Função para distribuição equitativa de leads entre vendedores
+  const getNextAvailableSeller = (schoolId: string): Seller | null => {
+    // Buscar todos os vendedores ativos da escola
+    const activeSellers = getSellersBySchool(schoolId).filter(seller => seller.active);
+    
+    if (activeSellers.length === 0) {
+      return null;
+    }
+    
+    if (activeSellers.length === 1) {
+      return activeSellers[0];
+    }
+    
+    // Contar leads atribuídos a cada vendedor
+    const schoolLeads = getLeadsBySchool(schoolId);
+    const sellerLeadCounts = activeSellers.map(seller => ({
+      seller,
+      leadCount: schoolLeads.filter(lead => lead.assignedTo === seller.id).length
+    }));
+    
+    // Ordenar por menor número de leads atribuídos
+    sellerLeadCounts.sort((a, b) => a.leadCount - b.leadCount);
+    
+    // Retornar o vendedor com menos leads atribuídos
+    return sellerLeadCounts[0].seller;
+  };
+
   const value: AuthContextType = {
     user,
     schools,
     sellers,
+    leadSources,
+    leads,
     currentSchool,
     isLoading,
     loginAsSchool,
@@ -335,7 +685,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     registerSeller,
     updateSeller,
     deleteSeller,
-    getSellersBySchool
+    getSellersBySchool,
+    registerLeadSource,
+    updateLeadSource,
+    deleteLeadSource,
+    getLeadSourcesBySchool,
+    toggleLeadSource,
+    registerLead,
+    updateLead,
+    deleteLead,
+    getLeadsBySchool,
+    getLeadStats,
+    getNextAvailableSeller
   };
 
   return (

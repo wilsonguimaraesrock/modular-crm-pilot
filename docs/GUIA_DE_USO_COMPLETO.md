@@ -96,6 +96,14 @@ O menu lateral possui **6 módulos principais**:
 
 ## 🤖 **Módulo 3: Qualificação IA**
 
+### **Sistema de Distribuição Automática:**
+**🎯 NOVIDADE**: O sistema agora distribui automaticamente os leads entre os vendedores de forma equitativa!
+
+- **Automático**: Quando você iniciar uma qualificação, o sistema escolhe o vendedor com menos leads
+- **Equitativo**: Garante que todos os vendedores recebam oportunidades iguais
+- **Personalizado**: A conversa começa com o nome do vendedor atribuído
+- **Visual**: Você verá qual vendedor foi atribuído durante a qualificação
+
 ### **Configuração Inicial (primeira vez):**
 
 #### **Passo 1: Configurar ChatGPT**
@@ -110,25 +118,41 @@ O menu lateral possui **6 módulos principais**:
 
 ### **Como qualificar um lead:**
 
-#### **Passo 1: Iniciar Conversa**
-1. **Digite uma pergunta inicial** na caixa de mensagem
-2. **Exemplo**: "Olá! Gostaria de entender melhor suas necessidades"
-3. **Clique em "Enviar"** ou pressione Enter
+#### **Passo 1: Iniciar Conversa Inteligente**
+1. **Clique em "Iniciar Qualificação Inteligente"**
+2. **O sistema automaticamente**:
+   - Seleciona o vendedor com menos leads
+   - Inicia com apresentação personalizada
+   - Exibe o vendedor atribuído no painel verde
+3. **A IA começa** com: "Olá, tudo bem? Eu sou [Nome] da [Nome da Escola]!"
 
-#### **Passo 2: Conversar com o Lead**
-1. **A IA responderá** automaticamente como se fosse o lead
-2. **Continue a conversa** fazendo perguntas de qualificação:
-   - "Qual o principal desafio da sua empresa?"
-   - "Você tem orçamento definido para essa solução?"
-   - "Quem toma as decisões de compra?"
-   - "Qual a urgência para implementar?"
+#### **Passo 2: Conversar de Forma Natural**
+1. **A IA fará 3 perguntas simples** e conversacionais:
+   - **Interesse**: "Qual é o seu principal objetivo com o inglês?"
+   - **Disponibilidade**: "Quando você gostaria de começar?"
+   - **Agendamento**: "Que tal conversarmos melhor? Posso agendar uma conversa rápida?"
 
-#### **Passo 3: Acompanhar o Score**
-- **Observe o score** no canto superior direito
-- **0-39**: Lead frio (vermelho)
-- **40-59**: Lead morno (azul)
-- **60-79**: Lead quente (amarelo)
-- **80-100**: Lead qualificado (verde)
+2. **Características da nova abordagem**:
+   - ✅ **Linguagem natural** e amigável
+   - ✅ **Aceita respostas gerais** (não exige detalhes)
+   - ✅ **Foco no agendamento**, não na qualificação técnica
+   - ✅ **Usa emojis** para ser mais humana
+   - ✅ **Indicador de digitação** realista (3 segundos)
+
+3. **Responda naturalmente** como se fosse o lead interessado
+4. **A IA será mais flexível** e direcionará para agendamento
+
+#### **Passo 3: Acompanhar Progresso da Conversa**
+- **Observe os 3 estágios** na parte inferior:
+  - **Interesse**: Motivação do lead
+  - **Disponibilidade**: Quando quer começar
+  - **Agendamento**: Aceita conversar
+- **Cada estágio tem**: Nome, barra de progresso, pontuação
+- **Cores indicam qualidade**:
+  - **Vermelho**: Baixa qualificação (0-39)
+  - **Azul**: Qualificação média (40-59)  
+  - **Amarelo**: Boa qualificação (60-79)
+  - **Verde**: Lead qualificado (80-100)
 
 #### **Passo 4: Finalizar Qualificação**
 - **Quando o score estiver satisfatório** (acima de 60)
@@ -252,20 +276,47 @@ O menu lateral possui **6 módulos principais**:
 
 ### **Aba 3: Equipe** 👥
 
+#### **🎯 Painel de Distribuição Equitativa (NOVO!):**
+**Localização**: No topo da aba Equipe, você verá um painel azul com estatísticas.
+
+**O que mostra**:
+1. **Cards por Vendedor**:
+   - Nome e percentual de leads atribuídos
+   - Total de leads recebidos
+   - Leads recebidos hoje
+   - Barra de progresso visual
+
+2. **Como funciona**:
+   - **Automático**: Sistema distribui leads sem intervenção
+   - **Equitativo**: Vendedor com menos leads recebe o próximo
+   - **Transparente**: Você vê a distribuição em tempo real
+   - **Por escola**: Cada escola tem distribuição independente
+
+**Exemplo do que você verá**:
+```
+┌─ Distribuição Equitativa de Leads ─────────────────┐
+│ Carlos Silva    35%  │ Ana Santos     28%  │ João  │
+│ Total: 45 leads     │ Total: 36 leads     │ etc...│
+│ Hoje: 3 leads       │ Hoje: 2 leads       │       │
+│ ████████░░░         │ ██████░░░░░         │       │
+└─────────────────────────────────────────────────────┘
+```
+
 #### **Gerenciar Vendedores:**
-1. **Veja todos os vendedores** na lista
+1. **Veja todos os vendedores** na lista (abaixo do painel de distribuição)
 2. **Para cada vendedor**:
    - Nome e foto (inicial)
    - Cargo na empresa
    - Telefone de contato
    - Status (Ativo/Inativo)
-3. **Status Ativo**: Recebe leads automaticamente
-4. **Status Inativo**: Não recebe atribuições
+3. **Status Ativo**: Recebe leads automaticamente via distribuição equitativa
+4. **Status Inativo**: Não participa da distribuição automática
 
 #### **Adicionar Vendedor:**
 1. **Clique em "Adicionar Vendedor"**
 2. **Preencha as informações**
-3. **Defina se estará ativo**
+3. **Defina se estará ativo** (importante para distribuição)
+4. **Vendedores ativos** automaticamente entram no sistema de distribuição
 
 ### **Aba 4: Sistema** 🔧
 

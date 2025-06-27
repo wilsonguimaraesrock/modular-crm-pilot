@@ -18,11 +18,14 @@ http://localhost:8081
 ### ✅ **Implementado e Funcional**
 - [x] **Dashboard**: Métricas em tempo real, pipeline visual
 - [x] **Captura de Leads**: Formulário multi-fonte, validação
-- [x] **Qualificação IA**: Integração ChatGPT, scoring automático
+- [x] **Qualificação IA**: Integração ChatGPT, conversa conversacional com foco em agendamento
+- [x] **🎯 Sistema de Distribuição Equitativa**: Atribuição automática de leads
+- [x] **👤 Apresentação Personalizada**: Nome do vendedor na conversa
+- [x] **📊 Painel de Estatísticas**: Distribuição visual por vendedor
 - [x] **Agendamento**: Seleção de datas, slots de horário
-- [x] **WhatsApp**: Integração Chatwoot, templates
-- [x] **Admin Panel**: 4 abas organizadas
-- [x] **Fontes de Leads**: Gestão completa (NOVA FUNCIONALIDADE)
+- [x] **WhatsApp**: Integração WAHA (substitui Chatwoot)
+- [x] **Admin Panel**: 4 abas organizadas + estatísticas de distribuição
+- [x] **Fontes de Leads**: Gestão completa
 - [x] **Navegação**: Menu lateral responsivo
 - [x] **Design System**: Tema dark, animações
 
@@ -143,14 +146,80 @@ border-slate-600            /* Bordas de inputs */
 <Badge variant="secondary" className="bg-blue-500/20 text-blue-400">
 ```
 
+## 🎯 **Sistema de Distribuição Equitativa**
+
+### **Algoritmo Principal**
+```typescript
+// AuthContext.tsx
+const getNextAvailableSeller = (schoolId: string): Seller | null => {
+  // 1. Buscar vendedores ativos da escola
+  const activeSellers = getSellersBySchool(schoolId).filter(seller => seller.active);
+  
+  // 2. Verificações básicas
+  if (activeSellers.length === 0) return null;
+  if (activeSellers.length === 1) return activeSellers[0];
+  
+  // 3. Contar leads atribuídos a cada vendedor
+  const schoolLeads = getLeadsBySchool(schoolId);
+  const sellerLeadCounts = activeSellers.map(seller => ({
+    seller,
+    leadCount: schoolLeads.filter(lead => lead.assignedTo === seller.id).length
+  }));
+  
+  // 4. Ordenar por menor número de leads atribuídos
+  sellerLeadCounts.sort((a, b) => a.leadCount - b.leadCount);
+  
+  // 5. Retornar o vendedor com menos leads
+  return sellerLeadCounts[0].seller;
+};
+```
+
+### **Integração com Qualificação**
+```typescript
+// LeadQualification.tsx
+const startConversation = async () => {
+  // 1. Buscar próximo vendedor disponível
+  const currentSeller = user ? getNextAvailableSeller(user.schoolId) : null;
+  
+  // 2. Armazenar vendedor atribuído
+  setAssignedSeller(currentSeller);
+  
+  // 3. Personalizar apresentação
+  const sellerFirstName = getFirstName(sellerToUse.name);
+  const introMessage = `Olá, tudo bem? 😊\n\nEu sou ${sellerFirstName} da ${schoolName}!\n\nComo posso te ajudar hoje?`;
+  
+  // 4. Iniciar conversa personalizada
+  setMessages(prev => [...prev.slice(1), { type: 'ai', content: introMessage, timestamp: new Date() }]);
+};
+```
+
+### **Estatísticas Visuais**
+```typescript
+// AdminPanel.tsx
+const getLeadDistributionStats = () => {
+  const schoolLeads = getLeadsBySchool(user.schoolId);
+  const activeSellers = salesTeam.filter(seller => seller.active);
+  
+  return activeSellers.map(seller => {
+    const sellerLeads = schoolLeads.filter(lead => lead.assignedTo === seller.id);
+    return {
+      seller,
+      totalLeads: sellerLeads.length,
+      todayLeads: sellerLeads.filter(lead => isToday(lead.createdAt)).length,
+      percentage: Math.round((sellerLeads.length / schoolLeads.length) * 100)
+    };
+  }).sort((a, b) => b.totalLeads - a.totalLeads);
+};
+```
+
 ## 🔄 **Fluxo de Estados**
 
-### **Pipeline de Leads**
+### **Pipeline de Leads (Atualizado)**
 ```
 1. LeadCapture → Cria lead
-2. LeadQualification → Adiciona score
+2. LeadQualification → Atribui vendedor + Conversa conversacional focada em agendamento
 3. CalendarScheduling → Agenda reunião  
-4. WhatsAppIntegration → Envia notificação
+4. WhatsAppIntegration → Envia notificação com nome do vendedor
 ```
 
 ### **Estados Globais**
@@ -162,8 +231,19 @@ pipeline: { novosLeads, qualificados, agendados, fechados }
 // AdminPanel - Configurações
 leadSources: Array<SourceConfig>    // Fontes de leads
 salesTeam: Array<TeamMember>        // Equipe de vendas
+distributionStats: Array<{          // NOVO: Estatísticas de distribuição
+  seller: Seller,
+  totalLeads: number,
+  todayLeads: number,
+  percentage: number
+}>
 aiPrompt: string                    // Prompt da IA
 systemSettings: SystemConfig        // Configurações globais
+
+// LeadQualification - Estados específicos
+assignedSeller: Seller | null       // NOVO: Vendedor atribuído
+currentStage: number                // NOVO: Estágio conversacional atual (3 estágios)
+stageScores: Record<string, number> // NOVO: Pontuações por estágio
 ```
 
 ## 🚨 **Debug e Troubleshooting**

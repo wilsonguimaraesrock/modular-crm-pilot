@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200" fill="none">
+  <!-- Background -->
+  <circle cx="100" cy="100" r="95" fill="#F59E0B" stroke="#EAB308" stroke-width="4"/>
+  <circle cx="100" cy="100" r="75" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
+  
+  <!-- Letter R -->
+  <g fill="white" stroke="none">
+    <!-- Vertical line -->
+    <rect x="70" y="60" width="10" height="80" rx="5"/>
+    
+    <!-- Top horizontal -->
+    <rect x="70" y="60" width="40" height="10" rx="5"/>
+    
+    <!-- Middle horizontal -->
+    <rect x="70" y="95" width="30" height="10" rx="5"/>
+    
+    <!-- Right vertical (top part) -->
+    <rect x="100" y="60" width="10" height="45" rx="5"/>
+    
+    <!-- Diagonal -->
+    <rect x="85" y="110" width="35" height="8" rx="4" transform="rotate(30 102 114)"/>
+  </g>
+  
+  <!-- Decorative dots -->
+  <circle cx="120" cy="80" r="3" fill="rgba(255,255,255,0.8)"/>
+  <circle cx="125" cy="125" r="2" fill="rgba(255,255,255,0.6)"/>
+  <circle cx="60" cy="100" r="2" fill="rgba(255,255,255,0.4)"/>
+</svg> 
