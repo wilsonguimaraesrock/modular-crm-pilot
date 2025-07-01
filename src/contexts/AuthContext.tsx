@@ -63,6 +63,45 @@ export interface Lead {
   updatedAt: Date;
 }
 
+export interface Appointment {
+  id: string;
+  leadId: string;
+  leadName: string;
+  leadPhone?: string;
+  leadEmail?: string;
+  date: string;
+  time: string;
+  type: 'presencial' | 'online';
+  status: 'agendado' | 'confirmado' | 'realizado' | 'cancelado' | 'remarcado';
+  schoolId: string;
+  assignedTo?: string; // ID do vendedor
+  notes?: string;
+  meetingLink?: string; // Para reuniões online
+  address?: string; // Para reuniões presenciais
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface QualificationConversation {
+  id: string;
+  leadName: string;
+  leadPhone?: string;
+  leadEmail?: string;
+  messages: Array<{
+    type: 'user' | 'ai' | 'system';
+    content: string;
+    timestamp: Date;
+  }>;
+  stage: number;
+  score: number;
+  stageScores: Record<string, number>;
+  schoolId: string;
+  assignedSeller?: string;
+  status: 'active' | 'completed' | 'abandoned';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface AuthUser {
   id: string;
   name: string;
@@ -79,6 +118,8 @@ interface AuthContextType {
   sellers: Seller[];
   leadSources: LeadSource[];
   leads: Lead[];
+  appointments: Appointment[];
+  qualificationConversations: QualificationConversation[];
   currentSchool: School | null;
   isLoading: boolean;
   
@@ -120,6 +161,18 @@ interface AuthContextType {
   
   // Lead distribution functions
   getNextAvailableSeller: (schoolId: string) => Seller | null;
+  
+  // Appointment functions
+  createAppointment: (data: Omit<Appointment, 'id' | 'createdAt' | 'updatedAt'>) => Promise<boolean>;
+  updateAppointment: (id: string, data: Partial<Appointment>) => Promise<boolean>;
+  deleteAppointment: (id: string) => Promise<boolean>;
+  getAppointmentsBySchool: (schoolId: string) => Appointment[];
+  
+  // Qualification Conversation functions
+  createQualificationConversation: (data: Omit<QualificationConversation, 'id' | 'createdAt' | 'updatedAt'>) => Promise<QualificationConversation | null>;
+  updateQualificationConversation: (id: string, data: Partial<QualificationConversation>) => Promise<boolean>;
+  getQualificationConversationsBySchool: (schoolId: string) => QualificationConversation[];
+  getActiveQualificationConversation: (schoolId: string) => QualificationConversation | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -255,6 +308,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return savedLeads ? JSON.parse(savedLeads) : [];
     } catch (error) {
       console.error('Erro ao recuperar leads:', error);
+      return [];
+    }
+  });
+  const [appointments, setAppointments] = useState<Appointment[]>(() => {
+    try {
+      const savedAppointments = localStorage.getItem('crm_appointments');
+      return savedAppointments ? JSON.parse(savedAppointments) : [];
+    } catch (error) {
+      console.error('Erro ao recuperar agendamentos:', error);
+      return [];
+    }
+  });
+  const [qualificationConversations, setQualificationConversations] = useState<QualificationConversation[]>(() => {
+    try {
+      const savedConversations = localStorage.getItem('crm_qualification_conversations');
+      return savedConversations ? JSON.parse(savedConversations) : [];
+    } catch (error) {
+      console.error('Erro ao recuperar conversas:', error);
       return [];
     }
   });
@@ -618,6 +689,101 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return leads.filter(l => l.schoolId === schoolId);
   };
 
+  // Appointment functions
+  const createAppointment = async (data: Omit<Appointment, 'id' | 'createdAt' | 'updatedAt'>): Promise<boolean> => {
+    try {
+      const newAppointment: Appointment = {
+        ...data,
+        id: `appointment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      const updatedAppointments = [...appointments, newAppointment];
+      setAppointments(updatedAppointments);
+      localStorage.setItem('crm_appointments', JSON.stringify(updatedAppointments));
+      return true;
+    } catch (error) {
+      console.error('Erro ao criar agendamento:', error);
+      return false;
+    }
+  };
+
+  const updateAppointment = async (id: string, data: Partial<Appointment>): Promise<boolean> => {
+    try {
+      const updatedAppointments = appointments.map(a => 
+        a.id === id ? { ...a, ...data, updatedAt: new Date() } : a
+      );
+      setAppointments(updatedAppointments);
+      localStorage.setItem('crm_appointments', JSON.stringify(updatedAppointments));
+      return true;
+    } catch (error) {
+      console.error('Erro ao atualizar agendamento:', error);
+      return false;
+    }
+  };
+
+  const deleteAppointment = async (id: string): Promise<boolean> => {
+    try {
+      const updatedAppointments = appointments.filter(a => a.id !== id);
+      setAppointments(updatedAppointments);
+      localStorage.setItem('crm_appointments', JSON.stringify(updatedAppointments));
+      return true;
+    } catch (error) {
+      console.error('Erro ao deletar agendamento:', error);
+      return false;
+    }
+  };
+
+  const getAppointmentsBySchool = (schoolId: string): Appointment[] => {
+    return appointments.filter(a => a.schoolId === schoolId);
+  };
+
+  // Qualification Conversation functions
+  const createQualificationConversation = async (data: Omit<QualificationConversation, 'id' | 'createdAt' | 'updatedAt'>): Promise<QualificationConversation | null> => {
+    try {
+      const newConversation: QualificationConversation = {
+        ...data,
+        id: `qualification_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      const updatedConversations = [...qualificationConversations, newConversation];
+      setQualificationConversations(updatedConversations);
+      localStorage.setItem('crm_qualification_conversations', JSON.stringify(updatedConversations));
+      return newConversation;
+    } catch (error) {
+      console.error('Erro ao criar conversa de qualificação:', error);
+      return null;
+    }
+  };
+
+  const updateQualificationConversation = async (id: string, data: Partial<QualificationConversation>): Promise<boolean> => {
+    try {
+      const updatedConversations = qualificationConversations.map(c => 
+        c.id === id ? { ...c, ...data, updatedAt: new Date() } : c
+      );
+      setQualificationConversations(updatedConversations);
+      localStorage.setItem('crm_qualification_conversations', JSON.stringify(updatedConversations));
+      return true;
+    } catch (error) {
+      console.error('Erro ao atualizar conversa de qualificação:', error);
+      return false;
+    }
+  };
+
+  const getQualificationConversationsBySchool = (schoolId: string): QualificationConversation[] => {
+    return qualificationConversations.filter(c => c.schoolId === schoolId);
+  };
+
+  const getActiveQualificationConversation = (schoolId: string): QualificationConversation | null => {
+    const activeConversations = qualificationConversations.filter(c => 
+      c.schoolId === schoolId && c.status === 'active'
+    );
+    return activeConversations.length > 0 ? activeConversations[activeConversations.length - 1] : null;
+  };
+
   const getLeadStats = (schoolId: string) => {
     const schoolLeads = getLeadsBySchool(schoolId);
     const today = new Date();
@@ -674,6 +840,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     sellers,
     leadSources,
     leads,
+    appointments,
+    qualificationConversations,
     currentSchool,
     isLoading,
     loginAsSchool,
@@ -696,7 +864,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     deleteLead,
     getLeadsBySchool,
     getLeadStats,
-    getNextAvailableSeller
+    getNextAvailableSeller,
+    createAppointment,
+    updateAppointment,
+    deleteAppointment,
+    getAppointmentsBySchool,
+    createQualificationConversation,
+    updateQualificationConversation,
+    getQualificationConversationsBySchool,
+    getActiveQualificationConversation
   };
 
   return (

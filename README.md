@@ -38,11 +38,16 @@ Sistema completo de gestão de relacionamento com clientes, desenvolvido especif
 - **Integração com pipeline** de vendas
 - **Gestão de reuniões** pendentes e confirmadas
 
-### 💬 **Integração WhatsApp**
-- **Chatwoot integration** para envio automático
-- **Templates personalizáveis** de mensagem
-- **Informações do lead** incluídas automaticamente
-- **Score de qualificação** na mensagem
+### 💬 **Integração WhatsApp** *(RENOVADO!)*
+- **WAHA (WhatsApp HTTP API)** para controle total
+- **Interface completa de conversas** em tempo real
+- **🖼️ Fotos de perfil reais** nos avatares dos contatos
+- **Player de mídia completo**: áudio, imagem, vídeo, documentos
+- **Auto-refresh** das conversas a cada 5 segundos
+- **Filtros inteligentes**: Individual/Grupos, busca por nome
+- **IA automática** com base de conhecimento da Rockfeller
+- **Status em tempo real**: Conectado/QR Code/Iniciando/Parado
+- **Marcação automática** de mensagens como lidas
 
 ### 👥 **Gestão de Equipe**
 - Cadastro e gerenciamento de vendedores
@@ -171,7 +176,11 @@ npm run preview      # Preview da build
 - ✅ **Apresentação personalizada com vendedor**
 - ✅ **Painel de estatísticas de distribuição**
 - ✅ Agendamento de reuniões
-- ✅ Integração WhatsApp/WAHA
+- ✅ **Integração WhatsApp completa com WAHA**
+- ✅ **🖼️ Fotos de perfil reais nos avatares das conversas**
+- ✅ **Player completo de mídia (áudio, vídeo, imagem, documentos)**
+- ✅ **Interface de chat em tempo real com auto-refresh**
+- ✅ **IA automática com base de conhecimento Rockfeller**
 - ✅ Painel administrativo completo
 - ✅ Gestão de equipe de vendas
 - ✅ Navegação modular responsiva

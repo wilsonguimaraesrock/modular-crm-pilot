@@ -185,49 +185,122 @@ const [selectedTime, setSelectedTime] = useState<string>('');
 
 ### **5. 💬 Integração WhatsApp (WhatsAppIntegration.tsx)**
 
-**Funcionalidade**: Sistema de envio automatizado de mensagens via Chatwoot para WhatsApp Business.
+**Funcionalidade**: Sistema completo de integração WhatsApp via WAHA (WhatsApp HTTP API) com interface de conversas em tempo real, fotos de perfil e suporte completo a mídias.
 
 **Componentes Principais**:
-- **Configuração Chatwoot**: Setup da integração
-- **Interface de Envio**: Formulário para enviar mensagens
-- **Templates**: Modelos pré-definidos de mensagens
+- **Configuração WAHA**: Setup da integração com WAHA API
+- **Gestão de Conversas**: Interface para visualizar e gerenciar conversas
+- **Sistema de Mensagens**: Envio e recebimento de mensagens em tempo real
+- **Avatares com Fotos**: Exibição de fotos reais dos contatos nos avatares
+- **Player de Mídia**: Suporte completo para áudio, imagem, vídeo e documentos
+- **IA Automática**: Automação inteligente de conversas
 
 **Estados Gerenciados**:
 ```typescript
-const [chatwootConfig, setChatwootConfig] = useState({
-  url: '',                      // URL da instância Chatwoot
-  token: '',                    // Token de API
-  inboxId: ''                   // ID da inbox
+const [wahaConfig, setWahaConfig] = useState({
+  url: 'http://localhost:3000',    // URL da instância WAHA
+  apiKey: '',                      // API Key (opcional)
+  session: 'default',              // Nome da sessão
+  chatgptKey: ''                   // Chave OpenAI para IA
 });
-const [isConfigured, setIsConfigured] = useState(false);
+
+const [sessionStatus, setSessionStatus] = useState<WAHASession | null>(null);
+const [chats, setChats] = useState<any[]>([]);
+const [selectedChat, setSelectedChat] = useState<string | null>(null);
+const [chatMessages, setChatMessages] = useState<any[]>([]);
+const [profilePictures, setProfilePictures] = useState<{[key: string]: string}>({});
 ```
 
-**Funcionalidades**:
-- ✅ Integração completa com Chatwoot
-- ✅ Envio automatizado de mensagens
-- ✅ Templates personalizáveis
-- ✅ Configuração segura de credenciais
-- ✅ Suporte a múltiplas inboxes
+**Funcionalidades de Conexão**:
+- ✅ **Status em Tempo Real**: Monitor de conexão WhatsApp (WORKING/SCAN_QR_CODE/STARTING/STOPPED)
+- ✅ **QR Code Automático**: Geração e exibição de QR Code para conexão
+- ✅ **Reconexão Automática**: Sistema de reconexão quando necessário
+- ✅ **Monitoramento Contínuo**: Verificação de status a cada 10 segundos
 
-**Template Padrão de Mensagem**:
+**Funcionalidades de Conversas**:
+- ✅ **Lista de Conversas**: Visualização de todas as conversas ativas
+- ✅ **Fotos de Perfil**: Exibição das fotos reais dos contatos nos avatares
+- ✅ **Badges de Mensagens**: Contador de mensagens não lidas
+- ✅ **Filtros Inteligentes**: Filtrar por contatos individuais ou incluir grupos
+- ✅ **Busca Avançada**: Buscar conversas por nome, ID ou número
+- ✅ **Auto-refresh**: Atualização automática a cada 5 segundos
+
+**Sistema de Avatares com Fotos**:
+```typescript
+const ChatAvatar = ({ chat, size = 40, className = "" }) => {
+  const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null);
+  
+  // Busca automática da foto de perfil via API WAHA
+  useEffect(() => {
+    if (!chat.isGroup && sessionStatus?.status === 'WORKING') {
+      getContactProfilePicture(chat.id._serialized)
+        .then(url => setProfilePicUrl(url))
+        .catch(() => setProfilePicUrl(null));
+    }
+  }, [chat.id._serialized]);
+
+  // Renderização com foto real ou fallback para ícones
+  return profilePicUrl ? (
+    <img src={profilePicUrl} className="rounded-full" />
+  ) : (
+    <div className="rounded-full bg-blue-500">
+      {chat.isGroup ? <Users /> : <User />}
+    </div>
+  );
+};
 ```
-🎯 *Lead Qualificado - CRM Inteligente*
 
-Olá! Identifiquei um lead com alto potencial de conversão.
+**Funcionalidades de Mídia**:
+- ✅ **Player de Áudio**: Reprodução nativa de mensagens de voz
+- ✅ **Visualizador de Imagens**: Exibição e download de imagens
+- ✅ **Player de Vídeo**: Reprodução de vídeos compartilhados
+- ✅ **Documentos**: Visualização e download de arquivos
+- ✅ **URLs de Mídia**: Obtenção automática de URLs via `downloadMedia=true`
 
-📊 *Informações do Lead:*
-- Score: [Score]/100
-- Nome: [Nome]
-- Email: [Email]
-- Telefone: [Telefone]
+**Funcionalidades de Mensagens**:
+- ✅ **Histórico Completo**: Carregamento das últimas 24 horas ou 50 mensagens
+- ✅ **Scroll Automático**: Auto-scroll para mensagens mais recentes
+- ✅ **Status de Leitura**: Marcação automática de mensagens como lidas
+- ✅ **Timestamps**: Horário de envio/recebimento
+- ✅ **Indicadores de Entrega**: Status de entrega das mensagens (✓, ✓✓, ✓✓ azul)
 
-💡 *Próximos Passos:*
-1. Contato em até 1 hora
-2. Agendar demonstração
-3. Enviar proposta
+**IA Automática**:
+- ✅ **Resposta Automática**: Sistema de IA para responder automaticamente
+- ✅ **Horário de Funcionamento**: Configuração de horários de trabalho
+- ✅ **Gatilhos de Transferência**: Palavras-chave para transferir para humano
+- ✅ **Base de Conhecimento**: Integração com dados da Rockfeller Brasil
 
-*Enviado automaticamente pelo CRM*
+**Funções da API WAHA**:
+```typescript
+// Buscar foto de perfil de um contato
+const getContactProfilePicture = async (contactId: string) => {
+  const response = await makeWAHARequest(
+    `/api/contacts/profile-picture?session=${session}&contactId=${contactId}`
+  );
+  return response?.profilePictureURL || null;
+};
+
+// Carregar mensagens com mídia
+const loadChatMessages = async (chatId: string) => {
+  const url = `/api/${session}/chats/${chatId}/messages?limit=100&downloadMedia=true`;
+  const messages = await makeWAHARequest(url);
+  return messages.sort((a, b) => a.timestamp - b.timestamp);
+};
+
+// Marcar conversa como lida
+const markChatAsRead = async (chatId: string) => {
+  await makeWAHARequest(`/api/${session}/chats/${chatId}/messages/read`, {
+    method: 'POST'
+  });
+};
 ```
+
+**Interface Moderna**:
+- ✅ **Design Responsivo**: Adaptável a diferentes tamanhos de tela
+- ✅ **Tema Escuro**: Interface elegante com gradientes
+- ✅ **Animações Suaves**: Transições com Framer Motion
+- ✅ **Notificações Toast**: Feedback visual para ações
+- ✅ **Status Dinâmico**: Indicadores visuais de conexão em tempo real
 
 ---
 

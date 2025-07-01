@@ -101,3 +101,56 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Custom scrollbar styles */
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+  
+  .scrollbar-thumb-slate-600 {
+    scrollbar-color: #475569 #1e293b;
+  }
+  
+  .scrollbar-track-slate-800 {
+    scrollbar-color: #475569 #1e293b;
+  }
+  
+  /* Webkit scrollbar styles for better browser support */
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: #1e293b;
+    border-radius: 3px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #475569;
+    border-radius: 3px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+  }
+
+  /* Chat height alternatives for mobile */
+  .chat-height-safe {
+    height: calc(55vh - 4rem); /* Ajustado para compensar o padding adicional */
+  }
+  
+  .chat-height-compact {
+    height: calc(40vh - 4rem); /* Versão mais compacta */
+  }
+  
+  .chat-height-full {
+    height: calc(65vh - 6rem); /* Versão com ainda mais espaço */
+  }
+  
+  .chat-height-adaptive {
+    height: calc(100vh - 22rem); /* Se adapta à tela inteira - compensando header */
+  }
+
+  /* Mobile layout - classes removidas para simplificar */
+}

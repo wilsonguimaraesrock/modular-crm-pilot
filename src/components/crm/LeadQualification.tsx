@@ -3,10 +3,12 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Send, Bot, Settings, Brain, FileText, X } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Send, Bot, Settings, Brain, FileText, X, MessageCircle, Code, Copy, ExternalLink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { useAuth, Seller } from '@/contexts/AuthContext';
+import { useAuth, Seller, QualificationConversation } from '@/contexts/AuthContext';
 
 interface QualificationStage {
   id: string;
@@ -19,15 +21,29 @@ interface QualificationStage {
 
 export const LeadQualification = () => {
   const isMobile = useIsMobile();
-  const { user, currentSchool, getSellersBySchool, getNextAvailableSeller } = useAuth();
+  const { 
+    user, 
+    currentSchool, 
+    getSellersBySchool, 
+    getNextAvailableSeller,
+    createQualificationConversation,
+    updateQualificationConversation,
+    getActiveQualificationConversation,
+    registerLead,
+    createAppointment
+  } = useAuth();
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Estados principais
-  const [messages, setMessages] = useState([
+  const [messages, setMessages] = useState<Array<{
+    type: 'user' | 'ai' | 'system';
+    content: string;
+    timestamp: Date;
+  }>>([
     {
       type: 'system',
-      content: 'Sistema de qualificação IA pronto. Configure sua API key do ChatGPT para começar.',
+      content: 'Sistema de qualificação IA pronto. Sua chave OpenAI já está configurada!',
       timestamp: new Date()
     }
   ]);
@@ -43,20 +59,70 @@ export const LeadQualification = () => {
   const [stageScores, setStageScores] = useState<Record<string, number>>({});
   const [assignedSeller, setAssignedSeller] = useState<Seller | null>(null);
   const [isTyping, setIsTyping] = useState(false);
+  
+  // Estados para persistência da conversa
+  const [currentConversation, setCurrentConversation] = useState<QualificationConversation | null>(null);
+  const [leadName, setLeadName] = useState('');
+  const [leadPhone, setLeadPhone] = useState('');
+  const [leadEmail, setLeadEmail] = useState('');
 
   // Configurações da IA e RAG
   const [aiPrompt, setAiPrompt] = useState('');
   const [ragFiles, setRagFiles] = useState<any[]>([]);
+  
+  // Estado para embed
+  const [showEmbedDialog, setShowEmbedDialog] = useState(false);
 
-  // Estágios de qualificação simplificados - foco no agendamento
+  // Função para carregar conhecimento padrão da Rockfeller
+  const loadDefaultRockfellerKnowledge = async (schoolId: string) => {
+    try {
+      const response = await fetch('/rockfeller-knowledge-base.txt');
+      if (response.ok) {
+        const content = await response.text();
+        
+        const defaultFile = {
+          id: `default_rockfeller_${Date.now()}`,
+          name: 'Rockfeller Knowledge Base (Padrão)',
+          type: 'text/plain',
+          size: content.length,
+          content: content,
+          uploadedAt: new Date().toISOString(),
+          processed: true,
+          chunks: Math.ceil(content.length / 1000),
+          isDefault: true
+        };
+
+        const defaultFiles = [defaultFile];
+        setRagFiles(defaultFiles);
+        
+        // Salvar no localStorage
+        const storageKey = `rag_files_${schoolId}`;
+        localStorage.setItem(storageKey, JSON.stringify(defaultFiles));
+        console.log(`[LeadQualification] Arquivo padrão da Rockfeller carregado automaticamente para escola ${schoolId}`);
+      }
+    } catch (error) {
+      console.error('[LeadQualification] Erro ao carregar arquivo padrão:', error);
+      setRagFiles([]);
+    }
+  };
+
+  // Estágios de qualificação com coleta de nome
   const qualificationStages: QualificationStage[] = [
+    {
+      id: 'name',
+      name: 'Identificação',
+      question: 'Oi! Como você gostaria que eu te chamasse? Qual é o seu nome?',
+      keywords: ['nome', 'chamo', 'sou', 'eu', 'me'],
+      followUpQuestions: [],
+      maxScore: 20
+    },
     {
       id: 'interest',
       name: 'Interesse',
-      question: 'Legal! Me conta, qual é o seu principal objetivo com o inglês?',
+      question: 'Legal [NOME]! Me conta, qual é o seu principal objetivo com o inglês?',
       keywords: ['trabalho', 'carreira', 'viagem', 'estudo', 'promoção', 'oportunidade', 'pessoal', 'profissional'],
       followUpQuestions: [],
-      maxScore: 30
+      maxScore: 25
     },
     {
       id: 'timing',
@@ -64,19 +130,24 @@ export const LeadQualification = () => {
       question: 'Entendi! E quando você gostaria de começar? Está procurando algo para começar logo?',
       keywords: ['agora', 'logo', 'semana', 'mês', 'urgente', 'quando', 'disponível'],
       followUpQuestions: [],
-      maxScore: 30
+      maxScore: 25
     },
     {
       id: 'schedule',
       name: 'Agendamento',
-      question: 'Perfeito! Que tal conversarmos melhor sobre isso? Posso agendar uma conversa rápida com você para te mostrar nossas opções?',
+      question: 'Perfeito [NOME]! Que tal conversarmos melhor sobre isso? Posso agendar uma conversa rápida com você para te mostrar nossas opções?',
       keywords: ['sim', 'claro', 'pode', 'quero', 'gostaria', 'quando', 'horário'],
       followUpQuestions: [],
-      maxScore: 40
+      maxScore: 30
     }
   ];
 
-  // Carregar configurações ao inicializar
+  // Garantir que a página carregue mostrando o topo
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  // Carregar configurações e conversa ativa ao inicializar
   useEffect(() => {
     if (user) {
       // Carregar configurações da IA
@@ -89,10 +160,17 @@ export const LeadQualification = () => {
       const savedFiles = localStorage.getItem(`rag_files_${user.schoolId}`);
       if (savedFiles) {
         try {
-          setRagFiles(JSON.parse(savedFiles));
+          const files = JSON.parse(savedFiles);
+          console.log(`[LeadQualification] Carregando ${files.length} arquivos RAG para escola ${user.schoolId}`);
+          setRagFiles(files);
         } catch (error) {
           console.error('Erro ao carregar arquivos RAG:', error);
+          setRagFiles([]);
         }
+      } else {
+        console.log(`[LeadQualification] Nenhum arquivo RAG encontrado para escola ${user.schoolId}`);
+        // Tentar carregar arquivo padrão se não houver arquivos RAG
+        loadDefaultRockfellerKnowledge(user.schoolId);
       }
 
       // Carregar API Key
@@ -101,19 +179,42 @@ export const LeadQualification = () => {
         setApiKey(savedApiKey);
         setIsConfigured(true);
       } else {
-        // Configurar API key padrão para teste
-        const defaultApiKey = 'AIzaSyB4v7NO0LZ3w1DOw2I4NsmLO4VHnFRC9Is';
+        // Configurar API key padrão da OpenAI
+        const defaultApiKey = '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';
         setApiKey(defaultApiKey);
         localStorage.setItem(`gemini_api_key_${user.schoolId}`, defaultApiKey);
         setIsConfigured(true);
       }
-    }
-  }, [user]);
 
-  // Scroll automático para o final das mensagens
+      // Carregar conversa ativa existente
+      const activeConversation = getActiveQualificationConversation(user.schoolId);
+      if (activeConversation) {
+        setCurrentConversation(activeConversation);
+        setLeadName(activeConversation.leadName);
+        setLeadPhone(activeConversation.leadPhone || '');
+        setLeadEmail(activeConversation.leadEmail || '');
+        setCurrentStage(activeConversation.stage);
+        setLeadScore(activeConversation.score);
+        setStageScores(activeConversation.stageScores);
+        setMessages(activeConversation.messages);
+        setConversationStarted(true);
+        setWaitingForResponse(true);
+        
+        // Buscar vendedor atribuído
+        if (activeConversation.assignedSeller) {
+          const seller = getSellersBySchool(user.schoolId).find(s => s.id === activeConversation.assignedSeller);
+          setAssignedSeller(seller || null);
+        }
+      }
+    }
+  }, [user, getActiveQualificationConversation, getSellersBySchool]);
+
+  // Scroll automático para o final das mensagens (apenas depois que a conversa começou)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isTyping]);
+    if (conversationStarted && messages.length > 1) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, isTyping, conversationStarted]);
 
   // Função para simular digitação e enviar mensagem
   const sendMessageWithTyping = (content: string, delay: number = 3000) => {
@@ -121,7 +222,7 @@ export const LeadQualification = () => {
     
     setTimeout(() => {
       const message = {
-        type: 'ai',
+        type: 'ai' as const,
         content,
         timestamp: new Date()
       };
@@ -141,12 +242,24 @@ export const LeadQualification = () => {
       return;
     }
 
+    if (!user) return;
+
+    // Verificar se já existe conversa ativa
+    const existingConversation = getActiveQualificationConversation(user.schoolId);
+    if (existingConversation) {
+      toast({
+        title: "Conversa já iniciada",
+        description: "Continue a conversa já em andamento",
+      });
+      return;
+    }
+
     setConversationStarted(true);
     setCurrentStage(0);
     setWaitingForResponse(false); // Começa sem esperar resposta para a apresentação
 
     // Buscar próximo vendedor disponível usando distribuição equitativa
-    const currentSeller = user ? getNextAvailableSeller(user.schoolId) : null;
+    const currentSeller = getNextAvailableSeller(user.schoolId);
     const sellerToUse = currentSeller || { name: 'Consultor' };
     
     // Armazenar o vendedor atribuído para esta conversa
@@ -195,7 +308,7 @@ export const LeadQualification = () => {
     // Mensagem de apresentação inicial
     const schoolName = currentSchool?.name || 'Rockfeller Brasil';
     const introMessage = {
-      type: 'ai',
+      type: 'ai' as const,
       content: `Olá, tudo bem? 😊
 
 Eu sou ${sellerFirstName} da ${schoolName}! 
@@ -204,29 +317,56 @@ Como posso te ajudar hoje?`,
       timestamp: new Date()
     };
 
-    setMessages(prev => [...prev.slice(1), introMessage]); // Remove mensagem do sistema
+    const initialMessages = [introMessage];
+    setMessages(initialMessages);
+
+    // Criar conversa persistente
+    const conversationData = {
+      leadName: '',
+      leadPhone: '',
+      leadEmail: '',
+      messages: initialMessages,
+      stage: 0,
+      score: 0,
+      stageScores: {},
+      schoolId: user.schoolId,
+      assignedSeller: currentSeller?.id,
+      status: 'active' as const
+    };
+
+    const newConversation = await createQualificationConversation(conversationData);
+    if (newConversation) {
+      setCurrentConversation(newConversation);
+    }
   };
 
   // Processar resposta do usuário
   const handleSendMessage = async () => {
-    if (!currentMessage.trim()) return;
+    if (!currentMessage.trim() || !currentConversation) return;
     
     // Se ainda não está esperando resposta (durante apresentação), apenas responder cordialmente
     if (!waitingForResponse && conversationStarted) {
       const userMessage = {
-        type: 'user',
+        type: 'user' as const,
         content: currentMessage,
         timestamp: new Date()
       };
-      setMessages(prev => [...prev, userMessage]);
+      
+      const updatedMessages = [...messages, userMessage];
+      setMessages(updatedMessages);
       setCurrentMessage('');
+      
+      // Atualizar conversa persistente
+      await updateQualificationConversation(currentConversation.id, {
+        messages: updatedMessages
+      });
       
       // Resposta cordial com indicador de digitação
       sendMessageWithTyping('Que bom! 😊 Vou te fazer algumas perguntinhas rápidas para entender melhor como posso te ajudar.', 2500);
       
-      // Primeira pergunta de qualificação após resposta cordial
+      // Primeira pergunta de qualificação após resposta cordial (pergunta do nome)
       setTimeout(() => {
-        const firstQuestion = qualificationStages[0].question;
+        const firstQuestion = qualificationStages[0].question; // "Oi! Como você gostaria que eu te chamasse? Qual é o seu nome?"
         sendMessageWithTyping(firstQuestion, 3000);
         setWaitingForResponse(true);
       }, 3000);
@@ -238,11 +378,27 @@ Como posso te ajudar hoje?`,
 
     // Adicionar mensagem do usuário
     const userMessage = {
-      type: 'user',
+      type: 'user' as const,
       content: currentMessage,
       timestamp: new Date()
     };
-    setMessages(prev => [...prev, userMessage]);
+    
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
+
+    // Capturar nome se estivermos no primeiro estágio
+    if (currentStage === 0 && !leadName) {
+      const extractedName = extractNameFromMessage(currentMessage);
+      if (extractedName) {
+        setLeadName(extractedName);
+        
+        // Atualizar conversa com o nome
+        await updateQualificationConversation(currentConversation.id, {
+          leadName: extractedName,
+          messages: updatedMessages
+        });
+      }
+    }
 
     try {
       // Mostrar indicador de digitação enquanto processa
@@ -252,14 +408,15 @@ Como posso te ajudar hoje?`,
       const response = await analyzeResponseAndGenerateNext(currentMessage, currentStage);
       
       // Simular tempo de digitação antes de mostrar resposta
-      setTimeout(() => {
+      setTimeout(async () => {
         const aiMessage = {
-          type: 'ai',
+          type: 'ai' as const,
           content: response.message,
           timestamp: new Date()
         };
         
-        setMessages(prev => [...prev, aiMessage]);
+        const finalMessages = [...updatedMessages, aiMessage];
+        setMessages(finalMessages);
         setIsTyping(false);
         
         // Atualizar score e estágio
@@ -269,15 +426,34 @@ Como posso te ajudar hoje?`,
           setCurrentStage(response.nextStage);
         }
         
-        // Se chegou ao final dos estágios, NÃO finalizar automaticamente
-        // Manter a conversa ativa para permitir mais interação e lidar com objeções
+        // Atualizar conversa persistente
+        await updateQualificationConversation(currentConversation.id, {
+          messages: finalMessages,
+          stage: response.nextStage,
+          score: leadScore + response.scoreIncrease,
+          stageScores: { ...stageScores, [qualificationStages[currentStage].id]: response.scoreIncrease }
+        });
+        
+        // Se chegou ao final dos estágios
         if (response.completed) {
-          // Não encerrar a conversa automaticamente
-          // setWaitingForResponse(false);
-          // setConversationStarted(false);
+          setWaitingForResponse(true); // Aguardar resposta para agendamento
           
-          // Manter conversa ativa para permitir que o lead responda
-          setWaitingForResponse(false);
+          // Criar lead qualificado
+          if (leadName && user) {
+            await registerLead({
+              name: leadName,
+              email: leadEmail || '',
+              phone: leadPhone || '',
+              source: 'Qualificação IA',
+              method: 'adults',
+              modality: 'presencial',
+              score: leadScore,
+              status: 'qualificado',
+              schoolId: user.schoolId,
+              assignedTo: assignedSeller?.id,
+              notes: `Lead qualificado via IA. Score: ${leadScore}/100`
+            });
+          }
         }
       }, 2500);
 
@@ -291,6 +467,186 @@ Como posso te ajudar hoje?`,
     }
 
     setCurrentMessage('');
+  };
+
+  // Processar resposta para agendamento
+  const handleSchedulingMessage = async () => {
+    if (!currentMessage.trim() || !currentConversation || !leadName) return;
+    
+    // Adicionar mensagem do usuário
+    const userMessage = {
+      type: 'user' as const,
+      content: currentMessage,
+      timestamp: new Date()
+    };
+    
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
+    
+    // Tentar processar agendamento
+    const scheduled = await handleSchedulingResponse(currentMessage);
+    
+    if (!scheduled) {
+      // Se não conseguiu agendar, responder de forma natural
+      const followUpMessage = {
+        type: 'ai' as const,
+        content: `Entendi! Sem problemas. 
+
+Se mudou de ideia e quiser conversar, é só me falar! Estou aqui para te ajudar quando precisar. 😊
+
+Tem mais alguma dúvida sobre nossos cursos?`,
+        timestamp: new Date()
+      };
+      
+      setTimeout(() => {
+        setMessages(prev => [...prev, followUpMessage]);
+        setWaitingForResponse(true);
+      }, 2000);
+    }
+    
+    // Atualizar conversa
+    await updateQualificationConversation(currentConversation.id, {
+      messages: updatedMessages
+    });
+    
+    setCurrentMessage('');
+  };
+
+  // Função principal de envio (roteamento)
+  const handleMainSendMessage = async () => {
+    if (currentStage >= qualificationStages.length - 1 && leadScore >= 80) {
+      // Estágio de agendamento
+      await handleSchedulingMessage();
+    } else {
+      // Estágios normais de qualificação
+      await handleSendMessage();
+    }
+  };
+
+  // Função para extrair nome da mensagem
+  const extractNameFromMessage = (message: string): string => {
+    const text = message.trim();
+    
+    // Padrões comuns para capturar nome
+    const patterns = [
+      /(?:me chamo|sou|nome é|é)\s+([A-Za-zÀ-ÿ\s]+)/i,
+      /(?:meu nome é|eu sou)\s+([A-Za-zÀ-ÿ\s]+)/i,
+      /^([A-Za-zÀ-ÿ\s]+)$/i, // Nome simples
+    ];
+    
+    for (const pattern of patterns) {
+      const match = text.match(pattern);
+      if (match && match[1]) {
+        // Limpar e formatar o nome
+        const name = match[1].trim()
+          .replace(/[^\w\sÀ-ÿ]/g, '') // Remove caracteres especiais
+          .replace(/\s+/g, ' ') // Remove espaços duplos
+          .split(' ')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+          .join(' ');
+        
+        // Validar se parece um nome (não muito longo, não é saudação, etc.)
+        if (name.length > 1 && name.length < 50 && 
+            !['oi', 'olá', 'bom dia', 'boa tarde', 'boa noite'].includes(name.toLowerCase())) {
+          return name;
+        }
+      }
+    }
+    
+    return '';
+  };
+
+  // Função para processar agendamento
+  const handleSchedulingResponse = async (response: string) => {
+    const lowerResponse = response.toLowerCase();
+    
+    // Detectar se lead quer agendar
+    if (lowerResponse.includes('sim') || lowerResponse.includes('claro') || 
+        lowerResponse.includes('pode') || lowerResponse.includes('quero') ||
+        lowerResponse.includes('gostaria') || lowerResponse.includes('aceito')) {
+      
+      // Detectar preferência (online/presencial)
+      const isOnline = lowerResponse.includes('online') || lowerResponse.includes('video') || 
+                      lowerResponse.includes('chamada') || lowerResponse.includes('virtual');
+      const isPresencial = lowerResponse.includes('presencial') || lowerResponse.includes('escola') ||
+                          lowerResponse.includes('pessoal') || lowerResponse.includes('ai');
+      
+      let meetingType: 'online' | 'presencial' = 'online';
+      if (isPresencial && !isOnline) {
+        meetingType = 'presencial';
+      }
+      
+      // Criar agendamento
+      if (user && leadName) {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        
+        const appointmentData = {
+          leadId: currentConversation?.id || '',
+          leadName: leadName,
+          leadPhone: leadPhone,
+          leadEmail: leadEmail,
+          date: tomorrow.toISOString().split('T')[0],
+          time: '14:00',
+          type: meetingType,
+          status: 'agendado' as const,
+          schoolId: user.schoolId,
+          assignedTo: assignedSeller?.id,
+          notes: `Agendamento via qualificação IA. Score: ${leadScore}/100`,
+          meetingLink: meetingType === 'online' ? 'https://meet.google.com/novo-link' : undefined,
+          address: meetingType === 'presencial' ? currentSchool?.address : undefined
+        };
+        
+        const success = await createAppointment(appointmentData);
+        
+        if (success) {
+          // Atualizar status do lead
+          if (currentConversation) {
+            await updateQualificationConversation(currentConversation.id, {
+              status: 'completed'
+            });
+          }
+          
+          // Mensagem de confirmação
+          const confirmationMessage = `Perfeito ${leadName}! 🎉
+
+Agendei sua conversa para amanhã às 14h00 (${meetingType === 'online' ? 'online' : 'na nossa escola'}).
+
+${meetingType === 'online' ? 
+  'Vou te enviar o link da reunião por WhatsApp.' : 
+  `Nosso endereço: ${currentSchool?.address || 'Endereço será enviado por WhatsApp'}`
+}
+
+Qualquer dúvida, me chame! 😊
+
+Até amanhã!`;
+
+          setTimeout(() => {
+            const message = {
+              type: 'ai' as const,
+              content: confirmationMessage,
+              timestamp: new Date()
+            };
+            setMessages(prev => [...prev, message]);
+            
+            // Finalizar conversa
+            setTimeout(() => {
+              setWaitingForResponse(false);
+              setConversationStarted(false);
+              
+              toast({
+                title: "Agendamento realizado!",
+                description: `Conversa agendada com ${leadName} para amanhã às 14h`,
+              });
+            }, 3000);
+          }, 1500);
+          
+          return true;
+        }
+      }
+    }
+    
+    return false;
   };
 
   // Analisar resposta e gerar próxima pergunta
@@ -347,34 +703,72 @@ COMO RESPONDER:
 
 Responda com uma mensagem natural e completa (máximo 3 frases).`;
 
-    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=' + apiKey, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: `${analysisPrompt}\n\nResposta do lead: ${userResponse}`
-              }
-            ]
-          }
-        ],
-        generationConfig: {
-          maxOutputTokens: 150,
+    let response;
+    let aiResponse;
+
+    // Detectar se é chave OpenAI ou Gemini
+    if (apiKey.startsWith('sk-')) {
+      // Usar OpenAI
+      response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-3.5-turbo',
+          messages: [
+            {
+              role: 'system',
+              content: analysisPrompt
+            },
+            {
+              role: 'user',
+              content: `Resposta do lead: ${userResponse}`
+            }
+          ],
+          max_tokens: 150,
           temperature: 0.7
-        }
-      })
-    });
+        })
+      });
 
-    if (!response.ok) {
-      throw new Error('Erro na API do Gemini');
+      if (!response.ok) {
+        throw new Error('Erro na API da OpenAI');
+      }
+
+      const data = await response.json();
+      aiResponse = data.choices[0].message.content;
+    } else {
+      // Usar Gemini (chave AIzaSy...)
+      response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=' + apiKey, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: `${analysisPrompt}\n\nResposta do lead: ${userResponse}`
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            maxOutputTokens: 150,
+            temperature: 0.7
+          }
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro na API do Gemini');
+      }
+
+      const data = await response.json();
+      aiResponse = data.candidates[0].content.parts[0].text;
     }
-
-    const data = await response.json();
-    const aiResponse = data.candidates[0].content.parts[0].text;
 
     // Analisar se deve avançar para próximo estágio (mais flexível)
     const scoreIncrease = analyzeScore(userResponse, currentStageData);
@@ -386,17 +780,33 @@ Responda com uma mensagem natural e completa (máximo 3 frases).`;
     if (!needsFollowUp) {
       nextStage = stageIndex + 1;
       if (nextStage >= qualificationStages.length) {
-        // Chegou ao final dos estágios - usar resposta natural da IA
-        // NÃO forçar mensagem padrão, deixar IA responder naturalmente
+        // Chegou ao final dos estágios - preparar para agendamento
+        const schedulingMessage = `Ótimo ${leadName || 'pessoal'}! 😊
+
+Baseado no que conversamos, vejo que você tem um perfil perfeito para nossos cursos. 
+
+Que tal marcarmos uma conversa mais detalhada? Posso agendar uns 15 minutinhos com você para:
+- Te mostrar nossa metodologia
+- Fazer um teste de nível personalizado
+- Apresentar as opções que mais se encaixam no seu perfil
+
+Prefere uma conversa online ou presencial na nossa escola?`;
+
         return {
-          message: aiResponse, // Usar resposta natural da IA
+          message: schedulingMessage,
           scoreIncrease,
           nextStage: stageIndex,
-          completed: false // Manter conversa ativa
+          completed: true
         };
       } else {
+        // Personalizar pergunta com nome do lead
+        let nextQuestion = qualificationStages[nextStage].question;
+        if (leadName) {
+          nextQuestion = nextQuestion.replace('[NOME]', leadName);
+        }
+        
         return {
-          message: qualificationStages[nextStage].question,
+          message: nextQuestion,
           scoreIncrease,
           nextStage,
           completed: false
@@ -458,9 +868,11 @@ Responda com uma mensagem natural e completa (máximo 3 frases).`;
     
     localStorage.setItem(`gemini_api_key_${user?.schoolId}`, apiKey);
     setIsConfigured(true);
+    
+    const apiType = apiKey.startsWith('sk-') ? 'OpenAI GPT-3.5' : 'Google Gemini 2.0';
     toast({
       title: "Configurado!",
-      description: "Gemini 2.0 Flash configurado com sucesso",
+      description: `${apiType} configurado com sucesso`,
     });
   };
 
@@ -472,8 +884,84 @@ Responda com uma mensagem natural e completa (máximo 3 frases).`;
     return 'text-red-400';
   };
 
+  // Gerar código de embed
+  const generateEmbedCode = () => {
+    const currentUrl = window.location.origin;
+    const schoolId = user?.schoolId || '1';
+    const embedUrl = `${currentUrl}/embed/chat-qualificacao?schoolId=${schoolId}`;
+    
+    return {
+      iframe: `<iframe 
+  src="${embedUrl}" 
+  width="400" 
+  height="600" 
+  frameborder="0" 
+  style="border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);">
+</iframe>`,
+      
+      widget: `<!-- Chat de Qualificação Rockfeller -->
+<div id="rockfeller-chat-widget"></div>
+<script>
+  (function() {
+    var iframe = document.createElement('iframe');
+    iframe.src = '${embedUrl}';
+    iframe.width = '400';
+    iframe.height = '600';
+    iframe.frameBorder = '0';
+    iframe.style.position = 'fixed';
+    iframe.style.bottom = '20px';
+    iframe.style.right = '20px';
+    iframe.style.borderRadius = '12px';
+    iframe.style.boxShadow = '0 4px 20px rgba(0,0,0,0.15)';
+    iframe.style.zIndex = '9999';
+    document.getElementById('rockfeller-chat-widget').appendChild(iframe);
+  })();
+</script>`,
+
+      popup: `<!-- Botão para abrir Chat -->
+<button id="rockfeller-chat-btn" style="
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  border: none;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+  z-index: 9999;
+" onclick="openRockfellerChat()">💬</button>
+
+<script>
+  function openRockfellerChat() {
+    var popup = window.open('${embedUrl}', 'RockfellerChat', 'width=450,height=650,scrollbars=no,resizable=no');
+    popup.focus();
+  }
+</script>`
+    };
+  };
+
+  // Copiar código para clipboard
+  const copyToClipboard = (text: string, type: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      toast({
+        title: "Copiado!",
+        description: `Código ${type} copiado para área de transferência`,
+      });
+    }).catch(() => {
+      toast({
+        title: "Erro",
+        description: "Não foi possível copiar o código",
+        variant: "destructive",
+      });
+    });
+  };
+
   return (
-    <div className={`space-y-${isMobile ? '4' : '6'}`}>
+    <div className={`space-y-${isMobile ? '3' : '6'} ${isMobile ? 'pb-4' : ''}`}>
       {/* Configuração */}
       {!isConfigured && (
         <Card className={`${
@@ -487,14 +975,14 @@ Responda com uma mensagem natural e completa (máximo 3 frases).`;
               <h3 className={`${
                 isMobile ? 'text-base' : 'text-lg'
               } font-semibold text-white`}>
-                Configurar Gemini 2.0 Flash
+                Configurar IA (OpenAI ou Gemini)
               </h3>
             </div>
             <div className="space-y-2">
               <Label htmlFor="apikey" className={`text-slate-300 ${
                 isMobile ? 'text-sm' : ''
               }`}>
-                API Key do Google Gemini
+                API Key (OpenAI: sk-... ou Gemini: AIzaSy...)
               </Label>
               <Input
                 id="apikey"
@@ -565,42 +1053,42 @@ Responda com uma mensagem natural e completa (máximo 3 frases).`;
         </Card>
       )}
 
-      {/* Lead Score e Status */}
+      {/* Header da Qualificação com Score - COMPACTO */}
       <Card className={`${
-        isMobile ? 'p-4' : 'p-6'
+        isMobile ? 'p-2' : 'p-3'
       } bg-slate-800/50 backdrop-blur-sm border-slate-700`}>
         <div className={`${
           isMobile 
-            ? 'flex flex-col space-y-3' 
+            ? 'flex flex-col space-y-1' 
             : 'flex items-center justify-between'
         }`}>
           <div className={`flex items-center ${
             isMobile ? 'space-x-1' : 'space-x-2'
           }`}>
-            <Bot className="text-blue-400" size={isMobile ? 18 : 24} />
+            <Bot className="text-blue-400" size={isMobile ? 14 : 16} />
             <h2 className={`${
-              isMobile ? 'text-lg' : 'text-2xl'
+              isMobile ? 'text-sm' : 'text-lg'
             } font-semibold text-white`}>
               Qualificação Inteligente
             </h2>
           </div>
-          <div className={`flex items-center space-x-4 ${
+          <div className={`flex items-center space-x-3 ${
             isMobile ? 'self-end' : ''
           }`}>
             {ragFiles.length > 0 && (
               <div className="flex items-center space-x-1">
-                <FileText className="text-purple-400" size={16} />
-                <span className="text-purple-400 text-sm">{ragFiles.length} arquivos RAG</span>
+                <FileText className="text-purple-400" size={12} />
+                <span className="text-purple-400 text-xs">{ragFiles.length} arquivos RAG</span>
               </div>
             )}
             <div className="text-center">
               <p className={`text-slate-300 ${
-                isMobile ? 'text-xs' : 'text-sm'
+                isMobile ? 'text-xs' : 'text-xs'
               }`}>
                 Score do Lead
               </p>
               <p className={`${
-                isMobile ? 'text-2xl' : 'text-3xl'
+                isMobile ? 'text-lg' : 'text-xl'
               } font-bold ${getScoreColor(leadScore)}`}>
                 {leadScore}/100
               </p>
@@ -609,13 +1097,210 @@ Responda com uma mensagem natural e completa (máximo 3 frases).`;
         </div>
       </Card>
 
+      {/* Critérios BANT - Movido para cima */}
+      <Card className={`${
+        isMobile ? 'p-3' : 'p-4'
+      } bg-slate-800/50 backdrop-blur-sm border-slate-700`}>
+        <h3 className={`${
+          isMobile ? 'text-sm mb-3' : 'text-base mb-4'
+        } font-semibold text-white flex items-center`}>
+          <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
+          Status da Qualificação
+        </h3>
+        <div className={`grid ${
+          isMobile 
+            ? 'grid-cols-2 gap-3' 
+            : 'grid-cols-1 md:grid-cols-4 gap-4'
+        }`}>
+          {qualificationStages.map((stage, index) => {
+            const stageScore = stageScores[stage.id] || 0;
+            const isActive = index === currentStage && conversationStarted;
+            return (
+              <div key={stage.id} className={`text-center p-3 rounded-lg transition-all duration-300 ${
+                isActive ? 'bg-blue-500/20 border border-blue-500/50 scale-105' : 'bg-slate-700/30'
+              }`}>
+                <p className={`text-slate-300 font-medium mb-2 ${
+                  isMobile ? 'text-xs' : 'text-sm'
+                } ${isActive ? 'text-blue-300' : ''}`}>
+                  {stage.name}
+                </p>
+                <div className="w-full bg-slate-700 rounded-full h-1 mb-2">
+                  <div
+                    className={`h-1 rounded-full transition-all duration-500 ${
+                      isActive 
+                        ? 'bg-gradient-to-r from-blue-500 to-blue-600' 
+                        : stageScore > 0
+                        ? 'bg-gradient-to-r from-green-500 to-green-600'
+                        : 'bg-gradient-to-r from-slate-500 to-slate-600'
+                    }`}
+                    style={{ width: `${Math.min(100, (stageScore / stage.maxScore) * 100)}%` }}
+                  />
+                </div>
+                <p className={`${
+                  isMobile ? 'text-xs' : 'text-sm'
+                } ${
+                  isActive ? 'text-blue-400 font-medium' : 'text-slate-400'
+                }`}>
+                  {stageScore}/{stage.maxScore}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+
       {/* Interface de Chat */}
       <Card className={`${
-        isMobile ? 'p-4' : 'p-6'
+        isMobile ? 'p-3' : 'p-4'
       } bg-slate-800/50 backdrop-blur-sm border-slate-700`}>
+        {/* Header do Chat */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center space-x-2">
+            <MessageCircle className="text-blue-400" size={18} />
+            <h3 className="text-lg font-medium text-white">Conversa com Lead</h3>
+          </div>
+          <div className="flex items-center space-x-3">
+            {/* Botão de Embed */}
+            <Dialog open={showEmbedDialog} onOpenChange={setShowEmbedDialog}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="bg-slate-700/50 border-slate-600 text-slate-300 hover:bg-slate-600/50 hover:text-white"
+                >
+                  <Code size={14} className="mr-1" />
+                  Embed
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl bg-slate-800 border-slate-700">
+                <DialogHeader>
+                  <DialogTitle className="text-white flex items-center">
+                    <Code className="mr-2" size={20} />
+                    Código de Incorporação - Chat de Qualificação
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Iframe Simples */}
+                    <div className="space-y-3">
+                      <h4 className="font-medium text-white flex items-center">
+                        <ExternalLink size={16} className="mr-2 text-blue-400" />
+                        Iframe Simples
+                      </h4>
+                      <p className="text-sm text-slate-400">
+                        Incorpore diretamente em qualquer página HTML
+                      </p>
+                      <div className="relative">
+                        <Textarea
+                          value={generateEmbedCode().iframe}
+                          readOnly
+                          className="bg-slate-900 border-slate-600 text-slate-300 text-xs font-mono h-32 resize-none"
+                        />
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="absolute top-2 right-2 h-6 w-6 p-0"
+                          onClick={() => copyToClipboard(generateEmbedCode().iframe, 'Iframe')}
+                        >
+                          <Copy size={12} />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Widget Flutuante */}
+                    <div className="space-y-3">
+                      <h4 className="font-medium text-white flex items-center">
+                        <MessageCircle size={16} className="mr-2 text-green-400" />
+                        Widget Flutuante
+                      </h4>
+                      <p className="text-sm text-slate-400">
+                        Chat fixo no canto inferior direito da página
+                      </p>
+                      <div className="relative">
+                        <Textarea
+                          value={generateEmbedCode().widget}
+                          readOnly
+                          className="bg-slate-900 border-slate-600 text-slate-300 text-xs font-mono h-32 resize-none"
+                        />
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="absolute top-2 right-2 h-6 w-6 p-0"
+                          onClick={() => copyToClipboard(generateEmbedCode().widget, 'Widget')}
+                        >
+                          <Copy size={12} />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Popup/Modal */}
+                    <div className="space-y-3">
+                      <h4 className="font-medium text-white flex items-center">
+                        <Bot size={16} className="mr-2 text-purple-400" />
+                        Botão + Popup
+                      </h4>
+                      <p className="text-sm text-slate-400">
+                        Botão que abre o chat em nova janela
+                      </p>
+                      <div className="relative">
+                        <Textarea
+                          value={generateEmbedCode().popup}
+                          readOnly
+                          className="bg-slate-900 border-slate-600 text-slate-300 text-xs font-mono h-32 resize-none"
+                        />
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="absolute top-2 right-2 h-6 w-6 p-0"
+                          onClick={() => copyToClipboard(generateEmbedCode().popup, 'Popup')}
+                        >
+                          <Copy size={12} />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Informações adicionais */}
+                  <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                    <h4 className="font-medium text-white mb-2">📋 Instruções de Uso:</h4>
+                    <ul className="text-sm text-slate-400 space-y-1 list-disc list-inside">
+                      <li><strong>Iframe:</strong> Cole o código HTML em qualquer página web</li>
+                      <li><strong>Widget:</strong> Adiciona um chat fixo que não interfere no layout</li>
+                      <li><strong>Popup:</strong> Ideal para sites que precisam economizar espaço</li>
+                      <li><strong>Personalização:</strong> Você pode alterar width, height e cores no CSS</li>
+                      <li><strong>Responsivo:</strong> Todos os códigos se adaptam a dispositivos móveis</li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-blue-900/20 rounded-lg p-4 border border-blue-500/30">
+                    <h4 className="font-medium text-blue-300 mb-2">🔗 URL do Chat:</h4>
+                    <code className="text-sm text-blue-400 bg-slate-900 px-2 py-1 rounded">
+                      {window.location.origin}/embed/chat-qualificacao?schoolId={user?.schoolId || '1'}
+                    </code>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {conversationStarted && (
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                <span className="text-green-400 text-sm">Ativo</span>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {/* Área de Mensagens 
+            ALTERNATIVAS DE ALTURA AJUSTADAS (troque 'chat-height-safe' por uma das opções):
+            - chat-height-safe: calc(55vh - 4rem) - Padrão, evita sobreposição
+            - chat-height-compact: calc(40vh - 4rem) - Mais compacto
+            - chat-height-full: calc(65vh - 6rem) - Máximo espaço
+            - chat-height-adaptive: calc(100vh - 22rem) - Adaptativo, compensa header
+        */}
         <div className={`${
-          isMobile ? 'h-64' : 'h-96'
-        } overflow-y-auto space-y-3 mb-4 p-3 bg-slate-900/30 rounded-lg border border-slate-700`}>
+          isMobile ? 'h-[30vh]' : 'h-[35vh]'
+        } overflow-y-auto space-y-3 mb-4 p-3 bg-slate-900/30 rounded-lg border border-slate-700 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800`}>
           {messages.map((msg, index) => (
             <div key={index} className={`flex ${
               msg.type === 'user' ? 'justify-end' : 'justify-start'
@@ -678,7 +1363,7 @@ Responda com uma mensagem natural e completa (máximo 3 frases).`;
               <Input
                 value={currentMessage}
                 onChange={(e) => setCurrentMessage(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                onKeyPress={(e) => e.key === 'Enter' && handleMainSendMessage()}
                 placeholder={
                   waitingForResponse 
                     ? "Digite sua resposta..." 
@@ -692,7 +1377,7 @@ Responda com uma mensagem natural e completa (máximo 3 frases).`;
                 disabled={false}
               />
               <Button
-                onClick={handleSendMessage}
+                onClick={handleMainSendMessage}
                 disabled={!currentMessage.trim()}
                 className={`bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 ${
                   isMobile ? 'h-12 px-3' : ''
@@ -723,53 +1408,6 @@ Responda com uma mensagem natural e completa (máximo 3 frases).`;
             </Button>
           </div>
         )}
-      </Card>
-
-      {/* Critérios BANT */}
-      <Card className={`${
-        isMobile ? 'p-4' : 'p-6'
-      } bg-slate-800/50 backdrop-blur-sm border-slate-700`}>
-        <h3 className={`${
-          isMobile ? 'text-base' : 'text-lg'
-        } font-semibold text-white mb-${isMobile ? '3' : '4'}`}>
-          Critérios BANT
-        </h3>
-        <div className={`grid ${
-          isMobile 
-            ? 'grid-cols-2 gap-3' 
-            : 'grid-cols-1 md:grid-cols-4 gap-4'
-        }`}>
-          {qualificationStages.map((stage, index) => {
-            const stageScore = stageScores[stage.id] || 0;
-            const isActive = index === currentStage && conversationStarted;
-            return (
-              <div key={stage.id} className={`text-center p-3 rounded-lg ${
-                isActive ? 'bg-blue-500/20 border border-blue-500/50' : ''
-              }`}>
-                <p className={`text-slate-300 font-medium mb-2 ${
-                  isMobile ? 'text-xs' : ''
-                }`}>
-                  {stage.name}
-                </p>
-                <div className="w-full bg-slate-700 rounded-full h-2 mb-2">
-                  <div
-                    className={`h-2 rounded-full transition-all duration-500 ${
-                      isActive 
-                        ? 'bg-gradient-to-r from-blue-500 to-blue-600' 
-                        : 'bg-gradient-to-r from-slate-500 to-slate-600'
-                    }`}
-                    style={{ width: `${Math.min(100, (stageScore / stage.maxScore) * 100)}%` }}
-                  />
-                </div>
-                <p className={`text-white font-semibold ${
-                  isMobile ? 'text-sm' : ''
-                }`}>
-                  {Math.min(stage.maxScore, stageScore)}/{stage.maxScore}
-                </p>
-              </div>
-            );
-          })}
-        </div>
       </Card>
     </div>
   );

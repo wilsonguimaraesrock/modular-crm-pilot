@@ -23,7 +23,7 @@ http://localhost:8081
 - [x] **👤 Apresentação Personalizada**: Nome do vendedor na conversa
 - [x] **📊 Painel de Estatísticas**: Distribuição visual por vendedor
 - [x] **Agendamento**: Seleção de datas, slots de horário
-- [x] **WhatsApp**: Integração WAHA (substitui Chatwoot)
+- [x] **WhatsApp**: Sistema completo com WAHA, fotos de perfil e mídia
 - [x] **Admin Panel**: 4 abas organizadas + estatísticas de distribuição
 - [x] **Fontes de Leads**: Gestão completa
 - [x] **Navegação**: Menu lateral responsivo
@@ -46,7 +46,7 @@ src/
 │   ├── LeadCapture.tsx             # 🎯 Captura multi-fonte
 │   ├── LeadQualification.tsx       # 🤖 IA + ChatGPT
 │   ├── CalendarScheduling.tsx      # 📅 Agendamento
-│   ├── WhatsAppIntegration.tsx     # 💬 WhatsApp/Chatwoot
+│   ├── WhatsAppIntegration.tsx     # 💬 WhatsApp/WAHA + Chat
 │   └── Navigation.tsx              # 🧭 Menu lateral
 ├── components/ui/           # 🎨 Componentes reutilizáveis
 ├── hooks/                   # 🔧 Custom hooks
@@ -209,6 +209,155 @@ const getLeadDistributionStats = () => {
       percentage: Math.round((sellerLeads.length / schoolLeads.length) * 100)
     };
   }).sort((a, b) => b.totalLeads - a.totalLeads);
+};
+```
+
+## 🖼️ **Sistema de Fotos de Perfil WhatsApp**
+
+### **Arquitetura WAHA + Cache**
+```typescript
+// WhatsAppIntegration.tsx
+
+// 1. Cache em memória para performance
+const [profilePictures, setProfilePictures] = useState<{[key: string]: string}>({});
+
+// 2. Função para buscar foto de perfil
+const getContactProfilePicture = async (contactId: string): Promise<string | null> => {
+  try {
+    // Verificar cache primeiro
+    if (profilePictures[contactId]) {
+      return profilePictures[contactId];
+    }
+
+    // Buscar via API WAHA
+    const response = await makeWAHARequest(
+      `/api/contacts/profile-picture?session=${wahaConfig.session}&contactId=${contactId}`
+    );
+    
+    if (response?.profilePictureURL) {
+      // Armazenar no cache
+      setProfilePictures(prev => ({
+        ...prev,
+        [contactId]: response.profilePictureURL
+      }));
+      return response.profilePictureURL;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error(`Erro ao obter foto de perfil para ${contactId}:`, error);
+    return null;
+  }
+};
+```
+
+### **Componente ChatAvatar Inteligente**
+```typescript
+const ChatAvatar = ({ chat, size = 40, className = "" }) => {
+  const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null);
+  const [imageError, setImageError] = useState(false);
+
+  // Auto-busca da foto para contatos individuais
+  useEffect(() => {
+    if (!chat.isGroup && sessionStatus?.status === 'WORKING') {
+      getContactProfilePicture(chat.id._serialized)
+        .then(url => setProfilePicUrl(url))
+        .catch(() => setProfilePicUrl(null));
+    }
+  }, [chat.id._serialized, chat.isGroup, sessionStatus?.status]);
+
+  // Renderização condicional: Foto real > Ícone padrão
+  if (!imageError && profilePicUrl && !chat.isGroup) {
+    return (
+      <div className={`relative ${className}`}>
+        <img
+          src={profilePicUrl}
+          alt={chat.name}
+          className="rounded-full object-cover"
+          style={{ width: size, height: size }}
+          onError={() => setImageError(true)}
+        />
+        {/* Badge de mensagens não lidas */}
+        {chat.unreadCount > 0 && (
+          <div className="absolute -top-1 -right-1 bg-red-500 rounded-full">
+            <span className="text-white text-xs font-bold">
+              {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Fallback para ícones (grupos ou sem foto)
+  return (
+    <div className={`relative ${className}`}>
+      {chat.isGroup ? (
+        <div className="bg-green-500 rounded-full flex items-center justify-center">
+          <Users className="text-white" />
+        </div>
+      ) : (
+        <div className="bg-blue-500 rounded-full flex items-center justify-center">
+          <User className="text-white" />
+        </div>
+      )}
+    </div>
+  );
+};
+```
+
+### **Integração com API WAHA**
+```typescript
+// Endpoints principais
+const wahaEndpoints = {
+  status: `/api/${session}/auth/me`,
+  chats: `/api/${session}/chats`,
+  messages: `/api/${session}/chats/${chatId}/messages?downloadMedia=true`,
+  profilePicture: `/api/contacts/profile-picture?session=${session}&contactId=${contactId}`,
+  sendMessage: `/api/sendText`,
+  markAsRead: `/api/${session}/chats/${chatId}/messages/read`
+};
+
+// Configuração padrão
+const wahaConfig = {
+  url: 'http://localhost:3000',    // URL da instância WAHA
+  session: 'default',              // Nome da sessão WhatsApp
+  apiKey: '',                      // API Key (opcional)
+  chatgptKey: ''                   // Para IA automática
+};
+```
+
+### **Player de Mídia Completo**
+```typescript
+const renderMediaContent = (media: any) => {
+  const mimeType = media.mimetype || '';
+  
+  if (mimeType.startsWith('audio/')) {
+    return (
+      <div className="bg-slate-600 rounded p-3">
+        <div className="flex items-center space-x-2 mb-2">
+          <Volume2 className="text-blue-400" size={16} />
+          <span className="text-sm text-slate-300">Mensagem de áudio</span>
+        </div>
+        <audio controls className="w-full max-w-xs">
+          <source src={media.url} type={mimeType} />
+        </audio>
+      </div>
+    );
+  }
+  
+  if (mimeType.startsWith('image/')) {
+    return (
+      <img 
+        src={media.url} 
+        alt="Imagem compartilhada"
+        className="max-w-xs rounded-lg cursor-pointer hover:opacity-80"
+        onClick={() => window.open(media.url, '_blank')}
+      />
+    );
+  }
+  
+  // Vídeo, documentos, etc...
 };
 ```
 

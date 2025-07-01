@@ -177,16 +177,46 @@ Inicie sempre com uma pergunta sobre os desafios atuais da empresa.`);
   });
 
   // Estado para arquivos RAG
-  const [ragFiles, setRagFiles] = useState(() => {
-    try {
-      const savedFiles = localStorage.getItem(`rag_files_${user?.schoolId || 'default'}`);
-      return savedFiles ? JSON.parse(savedFiles) : [];
-    } catch (error) {
-      return [];
-    }
-  });
-
+  const [ragFiles, setRagFiles] = useState<any[]>([]);
   const [uploadingFile, setUploadingFile] = useState(false);
+
+  // Função para carregar conhecimento padrão da Rockfeller
+  const loadDefaultRockfellerKnowledge = async (schoolId: string) => {
+    try {
+      const response = await fetch('/rockfeller-knowledge-base.txt');
+      if (response.ok) {
+        const content = await response.text();
+        
+        const defaultFile = {
+          id: `default_rockfeller_${Date.now()}`,
+          name: 'Rockfeller Knowledge Base (Padrão)',
+          type: 'text/plain',
+          size: content.length,
+          content: content,
+          uploadedAt: new Date().toISOString(),
+          processed: true,
+          chunks: Math.ceil(content.length / 1000),
+          isDefault: true
+        };
+
+        const defaultFiles = [defaultFile];
+        setRagFiles(defaultFiles);
+        
+        // Salvar no localStorage
+        const storageKey = `rag_files_${schoolId}`;
+        localStorage.setItem(storageKey, JSON.stringify(defaultFiles));
+        console.log(`Arquivo padrão da Rockfeller carregado automaticamente para escola ${schoolId}`);
+        
+        toast({
+          title: "Base de conhecimento carregada",
+          description: "Arquivo padrão da Rockfeller foi carregado automaticamente",
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao carregar arquivo padrão:', error);
+      setRagFiles([]);
+    }
+  };
 
   // Carregar configurações ao inicializar
   useEffect(() => {
@@ -195,6 +225,23 @@ Inicie sempre com uma pergunta sobre os desafios atuais da empresa.`);
       const savedPrompt = localStorage.getItem(`ai_prompt_${user.schoolId}`);
       if (savedPrompt) {
         setAiPrompt(savedPrompt);
+      }
+
+      // Carregar arquivos RAG para a escola específica
+      try {
+        const savedFiles = localStorage.getItem(`rag_files_${user.schoolId}`);
+        if (savedFiles) {
+          const files = JSON.parse(savedFiles);
+          console.log(`Carregando ${files.length} arquivos RAG para escola ${user.schoolId}`);
+          setRagFiles(files);
+        } else {
+          console.log(`Nenhum arquivo RAG encontrado para escola ${user.schoolId}`);
+          // Carregar arquivo padrão da Rockfeller se não houver arquivos RAG
+          loadDefaultRockfellerKnowledge(user.schoolId);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar arquivos RAG:', error);
+        setRagFiles([]);
       }
     }
   }, [user]);
@@ -365,7 +412,10 @@ Inicie sempre com uma pergunta sobre os desafios atuais da empresa.`);
         setRagFiles(updatedFiles);
         
         // Salvar no localStorage
-        localStorage.setItem(`rag_files_${user.schoolId}`, JSON.stringify(updatedFiles));
+        const storageKey = `rag_files_${user.schoolId}`;
+        localStorage.setItem(storageKey, JSON.stringify(updatedFiles));
+        console.log(`Arquivo ${file.name} salvo no localStorage com chave: ${storageKey}`);
+        console.log(`Total de arquivos RAG: ${updatedFiles.length}`);
         
         toast({
           title: "Arquivo processado",
@@ -1057,11 +1107,22 @@ Inicie sempre com uma pergunta sobre os desafios atuais da empresa.`);
                         {ragFiles.map((file: any) => (
                           <div key={file.id} className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
                             <div className="flex items-center space-x-3">
-                              <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
+                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                                file.isDefault 
+                                  ? 'bg-gradient-to-r from-green-500 to-emerald-500' 
+                                  : 'bg-gradient-to-r from-purple-500 to-blue-500'
+                              }`}>
                                 <FileText size={16} className="text-white" />
                               </div>
                               <div>
-                                <p className="text-white font-medium text-sm">{file.name}</p>
+                                <div className="flex items-center space-x-2">
+                                  <p className="text-white font-medium text-sm">{file.name}</p>
+                                  {file.isDefault && (
+                                    <Badge className="text-xs bg-green-500/20 text-green-400">
+                                      Padrão
+                                    </Badge>
+                                  )}
+                                </div>
                                 <p className="text-slate-400 text-xs">
                                   {formatFileSize(file.size)} • {file.chunks} chunks • 
                                   {new Date(file.uploadedAt).toLocaleDateString('pt-BR')}
@@ -1078,14 +1139,16 @@ Inicie sempre com uma pergunta sobre os desafios atuais da empresa.`);
                                 {file.processed ? 'Processado' : 'Processando'}
                               </Badge>
                               
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleRemoveFile(file.id)}
-                                className="border-red-600 text-red-400 hover:bg-red-600 hover:text-white h-8 w-8 p-0"
-                              >
-                                <Trash2 size={12} />
-                              </Button>
+                              {!file.isDefault && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleRemoveFile(file.id)}
+                                  className="border-red-600 text-red-400 hover:bg-red-600 hover:text-white h-8 w-8 p-0"
+                                >
+                                  <Trash2 size={12} />
+                                </Button>
+                              )}
                             </div>
                           </div>
                         ))}

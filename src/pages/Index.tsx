@@ -87,41 +87,41 @@ const Index = () => {
 
         {/* Main Content */}
         <main className={`flex-1 flex flex-col overflow-hidden ${
-          isMobile ? 'pt-16' : ''
+          isMobile ? 'pt-12' : ''
         }`}>
           {/* Header Mobile */}
           {isMobile && (
-            <header className="px-4 py-1.5 bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 backdrop-blur-sm border-b border-amber-400/30 fixed top-0 left-0 right-0 z-40 shadow-lg">
-              <div className="flex items-center justify-between">
-                                  <div className="flex items-center space-x-3 ml-12">
-                    <div className="flex items-center space-x-2">
-                      <RockfellerLogo size="medium" />
-                      <div>
-                        <h1 className="text-lg font-bold text-white">
-                          CRM ROCKFELLER
-                        </h1>
-                        <p className="text-xs text-white/80 -mt-1">
-                          {getModuleTitle()}
-                        </p>
-                      </div>
+            <header className="px-4 py-1 bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 backdrop-blur-sm border-b border-amber-400/30 fixed top-0 left-0 right-0 z-50 shadow-lg">
+              <div className="flex items-center justify-between h-10">
+                <div className="flex items-center space-x-2 ml-12">
+                  <div className="flex items-center space-x-2">
+                    <RockfellerLogo size="small" />
+                    <div>
+                      <h1 className="text-sm font-bold text-white leading-tight">
+                        CRM ROCKFELLER
+                      </h1>
+                      <p className="text-xs text-white/80 -mt-0.5 leading-tight">
+                        {getModuleTitle()}
+                      </p>
                     </div>
                   </div>
+                </div>
                 <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
               </div>
             </header>
           )}
 
-          {/* Header Desktop */}
+          {/* Header Desktop - COMPACTO */}
           {!isMobile && (
             <header className="bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 border-b border-amber-400/30 shadow-lg">
-              <div className="max-w-7xl mx-auto px-6 py-3">
-                <div className="flex items-center space-x-4">
-                  <RockfellerLogo size="xlarge" />
+              <div className="max-w-7xl mx-auto px-6 py-1.5">
+                <div className="flex items-center space-x-2">
+                  <RockfellerLogo size="medium" />
                   <div>
-                    <h1 className="text-4xl font-bold text-white mb-1">
+                    <h1 className="text-xl font-bold text-white leading-tight">
                       CRM ROCKFELLER
                     </h1>
-                    <p className="text-white/90 text-lg">
+                    <p className="text-white/90 text-xs leading-tight">
                       Sistema de gestão de leads com IA e integração WhatsApp via WAHA
                     </p>
                   </div>
@@ -132,7 +132,7 @@ const Index = () => {
 
           {/* Content Area */}
           <div className={`flex-1 overflow-auto ${
-            isMobile ? 'p-4' : 'p-6'
+            isMobile ? 'p-4 pt-2' : 'p-6'
           }`}>
             <div className={`${
               isMobile ? 'w-full' : 'max-w-7xl mx-auto'

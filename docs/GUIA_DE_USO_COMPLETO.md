@@ -193,44 +193,145 @@ O menu lateral possui **6 módulos principais**:
 
 ---
 
-## 💬 **Módulo 5: WhatsApp**
+## 💬 **Módulo 5: WhatsApp** - Sistema Completo de Conversas
+
+### **🎯 NOVA VERSÃO**: Sistema completo de gestão WhatsApp com interface de conversas, fotos de perfil e suporte a mídias!
 
 ### **Configuração Inicial (primeira vez):**
 
-#### **Passo 1: Configurar Chatwoot**
+#### **Passo 1: Configurar WAHA (WhatsApp HTTP API)**
 1. **Acesse o módulo "WhatsApp"**
-2. **Você verá um card azul** de configuração
-3. **Preencha os campos**:
-   - **URL do Chatwoot**: `https://app.chatwoot.com`
-   - **API Token**: Seu token do Chatwoot
-   - **Inbox ID**: ID da sua inbox (geralmente "1")
-4. **Para obter essas informações**:
-   - Acesse [Chatwoot.com](https://chatwoot.com)
-   - Crie uma conta gratuita
-   - Configure uma inbox do WhatsApp
-   - Gere um API token nas configurações
-5. **Clique em "Configurar Chatwoot"**
+2. **Clique na aba "Conexão"**
+3. **Você verá um card azul** de configuração
+4. **Preencha os campos**:
+   - **URL do WAHA**: `http://localhost:3000` (padrão)
+   - **Session Name**: `default` (padrão)
+   - **API Key**: Deixe vazio se não usar
+   - **OpenAI API Key**: Para IA automática (opcional)
+5. **Clique em "Salvar Configurações"**
 
-### **Como enviar mensagem para um lead:**
+#### **Passo 2: Conectar WhatsApp**
+1. **Após salvar**, aguarde o sistema verificar conexão
+2. **Se aparecer QR Code**: Escaneie com seu WhatsApp
+3. **Status mudará para "Conectado"** (indicador verde)
+4. **Download do QR**: Clique no botão para baixar o QR
 
-#### **Passo 1: Inserir Número**
-1. **Digite o número do WhatsApp** do lead
-2. **Formato**: `+55 11 99999-9999`
-3. **Inclua código do país** (+55 para Brasil)
+### **🎮 Interface Principal - 4 Abas:**
 
-#### **Passo 2: Personalizar Mensagem**
-1. **Use o template padrão** ou personalize
-2. **Template inclui**:
-   - Identificação como lead qualificado
-   - Score de qualificação
-   - Informações do lead
-   - Próximos passos
-3. **Edite conforme necessário**
+#### **📶 Aba 1: Conexão**
+**Controle total da conexão WhatsApp**
 
-#### **Passo 3: Enviar**
-1. **Clique em "Enviar Mensagem"**
-2. **Aguarde confirmação**
-3. **Mensagem será enviada** via Chatwoot/WhatsApp
+**Status Possíveis**:
+- 🟢 **Conectado** (WORKING): WhatsApp funcionando
+- 🟡 **Aguardando QR** (SCAN_QR_CODE): Escaneie QR Code
+- 🔵 **Iniciando** (STARTING): Sistema inicializando
+- 🔴 **Parado** (STOPPED): WhatsApp desconectado
+
+**Funcionalidades**:
+- ✅ **Status em tempo real** (atualização automática)
+- ✅ **QR Code automático** quando necessário
+- ✅ **Download do QR** para uso em outro dispositivo
+- ✅ **Botões de controle**: Iniciar/Parar sessão
+
+#### **💬 Aba 2: Conversas** - NOVA!
+**Interface completa de chat com fotos de perfil**
+
+**🖼️ Fotos de Perfil nos Avatares (NOVIDADE!)**:
+- ✅ **Fotos reais** dos contatos do WhatsApp
+- ✅ **Carregamento automático** das fotos de perfil
+- ✅ **Cache inteligente** para melhor performance
+- ✅ **Fallback para ícones** quando não há foto
+- ✅ **Diferentes ícones** para contatos e grupos
+
+**Lista de Conversas**:
+1. **Visualização moderna** com fotos nos avatares
+2. **Badges vermelhos** com número de mensagens não lidas
+3. **Filtros inteligentes**:
+   - **Individual/Todos**: Toggle para mostrar/ocultar grupos
+   - **Busca**: Pesquisar por nome, ID ou número
+4. **Auto-atualização** a cada 5 segundos
+5. **Indicadores visuais**:
+   - 🟢 **Verde**: Conversas com mensagens não lidas
+   - 🔵 **Azul**: Conversa selecionada
+   - 🕒 **Timestamps**: Horário da última mensagem
+
+**Interface de Chat**:
+1. **Área de mensagens** com scroll automático
+2. **Suporte completo a mídias**:
+   - 🎵 **Áudio**: Player nativo para mensagens de voz
+   - 🖼️ **Imagens**: Visualização e download
+   - 🎥 **Vídeos**: Player integrado
+   - 📄 **Documentos**: Download direto
+3. **Status de entrega**: ✓ (enviado), ✓✓ (entregue), ✓✓ azul (lido)
+4. **Envio de mensagens** em tempo real
+5. **Auto-refresh** das mensagens durante conversa ativa
+
+**Como usar as Conversas**:
+1. **Aguarde WhatsApp conectar** (status verde)
+2. **Clique em "Atualizar"** para carregar conversas
+3. **Use filtros** para encontrar conversas específicas
+4. **Clique numa conversa** para abrir o chat
+5. **Digite mensagem** na caixa inferior e pressione Enter
+6. **Mensagens são marcadas como lidas** automaticamente
+
+#### **🤖 Aba 3: IA Automática** - NOVA!
+**Sistema de resposta automática inteligente**
+
+**Configurações da IA**:
+1. **Resposta Automática**: Liga/desliga sistema
+2. **Horário de Funcionamento**: Define quando IA responde
+3. **Máximo de Mensagens**: Limite por conversa
+4. **Gatilhos de Transferência**: Palavras para passar para humano
+
+**Base de Conhecimento**:
+- ✅ **Conhecimento da Rockfeller**: Cursos, preços, modalidades
+- ✅ **Respostas inteligentes** baseadas no contexto
+- ✅ **Qualificação automática** de leads
+- ✅ **Transferência inteligente** para vendedores
+
+#### **📤 Aba 4: Envio Manual**
+**Envio direto de mensagens para qualquer número**
+
+**Como enviar**:
+1. **Digite o número** (formato: 5511999999999)
+2. **Escreva a mensagem**
+3. **Clique em "Enviar"**
+4. **Aguarde confirmação**
+
+**Casos de uso**:
+- ✅ **Leads qualificados**: Notificar vendedores
+- ✅ **Prospecção ativa**: Mensagens para novos contatos
+- ✅ **Follow-up**: Acompanhamento de propostas
+
+### **🎨 Funcionalidades Visuais Avançadas:**
+
+#### **Avatares Inteligentes**:
+```
+👤 Contatos: Foto real → Ícone azul (fallback)
+👥 Grupos: Ícone verde com Users
+🔴 Badge: Número de mensagens não lidas
+```
+
+#### **Player de Mídia**:
+```
+🎵 Áudio: [▶️ 0:00 / 1:23] Download
+🖼️ Imagem: [Preview] Clique para ampliar
+🎥 Vídeo: [Player nativo] Controles completos
+📄 Documento: [📄 arquivo.pdf] Download
+```
+
+#### **Status de Conexão**:
+```
+🟢 Conectado (pulsando) | 409 conversas ativas
+🟡 Aguardando QR | Escaneie para conectar
+🔵 Iniciando... | Aguarde conexão
+🔴 Desconectado | Clique para conectar
+```
+
+### **📱 Experiência Mobile:**
+- ✅ **Design responsivo** para smartphones
+- ✅ **Interface touch-friendly**
+- ✅ **Performance otimizada** para dispositivos móveis
 
 ---
 

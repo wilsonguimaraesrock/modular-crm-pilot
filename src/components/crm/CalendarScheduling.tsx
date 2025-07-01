@@ -4,9 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { motion } from 'framer-motion';
+import { useAuth } from '@/contexts/AuthContext';
 
 export const CalendarScheduling = () => {
   const isMobile = useIsMobile();
+  const { user, getAppointmentsBySchool, createAppointment } = useAuth();
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedTime, setSelectedTime] = useState<string>('');
 
@@ -14,11 +16,8 @@ export const CalendarScheduling = () => {
     '09:00', '10:00', '11:00', '14:00', '15:00', '16:00', '17:00'
   ];
 
-  const upcomingMeetings = [
-    { client: 'Maria Silva', date: '2024-01-15', time: '10:00', status: 'Confirmado' },
-    { client: 'João Santos', date: '2024-01-15', time: '14:00', status: 'Pendente' },
-    { client: 'Ana Costa', date: '2024-01-16', time: '09:00', status: 'Confirmado' },
-  ];
+  // Buscar agendamentos reais do sistema
+  const upcomingMeetings = user ? getAppointmentsBySchool(user.schoolId) : [];
 
   const handleSchedule = () => {
     if (selectedDate && selectedTime) {
@@ -156,21 +155,30 @@ export const CalendarScheduling = () => {
                       <p className={`text-white font-medium ${
                         isMobile ? 'text-sm' : ''
                       }`}>
-                        {meeting.client}
+                        {meeting.leadName}
                       </p>
                       <p className={`text-slate-400 ${
                         isMobile ? 'text-xs' : 'text-sm'
                       }`}>
                         {new Date(meeting.date).toLocaleDateString('pt-BR')} às {meeting.time}
                       </p>
+                      <p className={`text-slate-500 ${
+                        isMobile ? 'text-xs' : 'text-sm'
+                      }`}>
+                        {meeting.type === 'online' ? '🌐 Online' : '🏢 Presencial'}
+                      </p>
                     </div>
                   </div>
                   <span className={`${
                     isMobile ? 'self-start ml-12' : ''
                   } px-3 py-1 rounded-full text-xs font-medium ${
-                    meeting.status === 'Confirmado' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'
+                    meeting.status === 'confirmado' || meeting.status === 'agendado' 
+                      ? 'bg-green-500/20 text-green-400' 
+                      : meeting.status === 'realizado'
+                      ? 'bg-blue-500/20 text-blue-400'
+                      : 'bg-yellow-500/20 text-yellow-400'
                   }`}>
-                    {meeting.status}
+                    {meeting.status.charAt(0).toUpperCase() + meeting.status.slice(1)}
                   </span>
                 </motion.div>
               ))}

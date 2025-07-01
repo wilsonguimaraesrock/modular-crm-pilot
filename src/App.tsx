@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+import { EmbedChat } from "./pages/EmbedChat";
 
 const queryClient = new QueryClient();
 
@@ -25,6 +26,10 @@ const App = () => (
                   <Index />
                 </ProtectedRoute>
               } 
+            />
+            <Route 
+              path="/embed/chat-qualificacao" 
+              element={<EmbedChat />} 
             />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
