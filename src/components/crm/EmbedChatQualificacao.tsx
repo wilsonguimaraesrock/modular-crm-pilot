@@ -143,11 +143,12 @@ Antes de começarmos, Qual é o seu nome?`;
     setMessages(prev => [...prev, userMessage]);
 
     // Capturar nome se estivermos no primeiro estágio
+    let extractedNameForThisMessage = '';
     if (currentStage === 0 && !leadName) {
-      const extractedName = extractNameFromMessage(currentMessage);
-      if (extractedName) {
-        console.log(`[EmbedChat] Nome capturado: "${extractedName}"`);
-        setLeadName(extractedName);
+      extractedNameForThisMessage = extractNameFromMessage(currentMessage);
+      if (extractedNameForThisMessage) {
+        console.log(`[EmbedChat] Nome capturado: "${extractedNameForThisMessage}"`);
+        setLeadName(extractedNameForThisMessage);
       } else {
         console.log(`[EmbedChat] Nome NÃO capturado da mensagem: "${currentMessage}"`);
       }
@@ -160,11 +161,8 @@ Antes de começarmos, Qual é o seu nome?`;
       let response = "";
       
       if (currentStage === 0) {
-        // Tentar capturar o nome
-        const extractedName = extractNameFromMessage(currentMessage);
-        if (extractedName) {
-          setLeadName(extractedName);
-          
+        // Usar o nome capturado nesta mensagem
+        if (extractedNameForThisMessage) {
           // Buscar vendedores reais da escola
           const schoolSellers = getSellersBySchool(schoolId).filter(s => s.active);
           const currentSchool = schools.find(s => s.id === schoolId);
@@ -172,7 +170,7 @@ Antes de começarmos, Qual é o seu nome?`;
           const sellerFirstName = getFirstName(fullSellerName);
           const schoolName = currentSchool?.name || 'Rockfeller Brasil';
           
-          response = `Muito prazer, ${extractedName}! 😊 Meu nome é ${sellerFirstName} da ${schoolName}.\n\nPara te apresentar o curso ideal, você busca inglês para qual objetivo? É para você, para o trabalho, para os filhos? 😉`;
+          response = `Muito prazer, ${extractedNameForThisMessage}! 😊 Meu nome é ${sellerFirstName} da ${schoolName}.\n\nPara te apresentar o curso ideal, você busca inglês para qual objetivo? É para você, para o trabalho, para os filhos? 😉`;
           setCurrentStage(1);
         } else {
           response = "Não consegui identificar seu nome. Pode me dizer de novo como gostaria que eu te chamasse?";
@@ -187,8 +185,9 @@ Antes de começarmos, Qual é o seu nome?`;
         response = "Obrigada pelas informações! Nossa equipe entrará em contato em breve.";
       }
       
-      // Aplicar substituição de placeholders
-      const cleanResponse = replacePlaceholders(response, leadName);
+      // Aplicar substituição de placeholders usando nome capturado ou do estado
+      const currentLeadName = extractedNameForThisMessage || leadName;
+      const cleanResponse = replacePlaceholders(response, currentLeadName);
       
       const aiMessage: Message = {
         type: 'ai',
