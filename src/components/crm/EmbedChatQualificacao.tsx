@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Send, Bot, MessageCircle } from 'lucide-react';
+import { Send, Bot, MessageCircle, RotateCcw, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Message {
   type: 'user' | 'ai' | 'system';
@@ -13,6 +14,7 @@ interface Message {
 
 export const EmbedChatQualificacao = ({ schoolId }: { schoolId: string }) => {
   const { toast } = useToast();
+  const { getSellersBySchool, schools } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [messages, setMessages] = useState<Message[]>([
@@ -26,6 +28,8 @@ export const EmbedChatQualificacao = ({ schoolId }: { schoolId: string }) => {
   const [leadScore, setLeadScore] = useState(0);
   const [conversationStarted, setConversationStarted] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [leadName, setLeadName] = useState('');
+  const [currentStage, setCurrentStage] = useState(0);
 
   useEffect(() => {
     if (conversationStarted && messages.length > 1) {
@@ -33,16 +37,38 @@ export const EmbedChatQualificacao = ({ schoolId }: { schoolId: string }) => {
     }
   }, [messages, isTyping, conversationStarted]);
 
+  // Função para iniciar uma nova conversa
+  const startNewConversation = () => {
+    // Resetar todos os estados
+    setConversationStarted(false);
+    setCurrentMessage('');
+    setLeadScore(0);
+    setIsTyping(false);
+    setLeadName('');
+    setCurrentStage(0);
+    setMessages([
+      {
+        type: 'system',
+        content: 'Chat de qualificação carregado! Clique em "Iniciar Conversa" para começar.',
+        timestamp: new Date()
+      }
+    ]);
+
+    toast({
+      title: "Nova Conversa",
+      description: "Pronto para iniciar uma nova qualificação",
+    });
+  };
+
   const startConversation = () => {
     setConversationStarted(true);
+    setCurrentStage(0);
 
     const welcomeMessage = `Olá! 😊
 
 Sou a assistente virtual da Rockfeller Brasil! 
 
-Vou te fazer algumas perguntinhas rápidas para entender melhor como posso te ajudar com o inglês.
-
-Como você gostaria que eu te chamasse?`;
+Antes de começarmos, Qual é o seu nome?`;
 
     const initialMessage: Message = {
       type: 'ai',
@@ -51,6 +77,58 @@ Como você gostaria que eu te chamasse?`;
     };
 
     setMessages([initialMessage]);
+  };
+
+  // Função para extrair nome da mensagem
+  const extractNameFromMessage = (message: string): string => {
+    const text = message.trim();
+    
+    // Lista de palavras a ignorar
+    const stopWords = ['oi', 'olá', 'ola', 'hey', 'bom', 'dia', 'tarde', 'noite', 'tudo', 'bem', 'boa', 'e', 'é', 'sou', 'me', 'chamo', 'meu', 'nome', 'minha', 'eu', 'a', 'o', 'da', 'do', 'de'];
+    
+    // Primeiro, tentar padrões específicos
+    const patterns = [
+      /(?:me chamo|sou|nome é|é)\s+([A-Za-zÀ-ÿ\s]+)/i,
+      /(?:meu nome é|eu sou)\s+([A-Za-zÀ-ÿ\s]+)/i,
+    ];
+    
+    for (const pattern of patterns) {
+      const match = text.match(pattern);
+      if (match && match[1]) {
+        const name = match[1].trim()
+          .replace(/[^\w\sÀ-ÿ]/g, '')
+          .replace(/\s+/g, ' ')
+          .split(' ')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+          .join(' ');
+        
+        if (name.length > 1 && name.length < 50) {
+          console.log(`[EmbedChat] Nome extraído via padrão: "${name}"`);
+          return name;
+        }
+      }
+    }
+    
+    // Se não encontrou com padrões, tentar texto simples (como "WADE")
+    const words = text.toLowerCase().split(/\s+/);
+    const filteredWords = words.filter(word => 
+      word.length > 1 && 
+      !stopWords.includes(word) &&
+      /^[a-záàâãéèêíìîóòôõúùûç]+$/i.test(word) // Apenas letras
+    );
+    
+    if (filteredWords.length > 0 && filteredWords.length <= 3) {
+      // Pegar até 2 palavras para nome composto
+      const name = filteredWords.slice(0, 2)
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+      
+      console.log(`[EmbedChat] Nome extraído via texto simples: "${name}" (original: "${text}")`);
+      return name;
+    }
+    
+    console.log(`[EmbedChat] Não conseguiu extrair nome de: "${text}"`);
+    return '';
   };
 
   const handleSendMessage = async () => {
@@ -63,22 +141,58 @@ Como você gostaria que eu te chamasse?`;
     };
     
     setMessages(prev => [...prev, userMessage]);
-    setCurrentMessage('');
 
+    // Capturar nome se estivermos no primeiro estágio
+    if (currentStage === 0 && !leadName) {
+      const extractedName = extractNameFromMessage(currentMessage);
+      if (extractedName) {
+        console.log(`[EmbedChat] Nome capturado: "${extractedName}"`);
+        setLeadName(extractedName);
+      } else {
+        console.log(`[EmbedChat] Nome NÃO capturado da mensagem: "${currentMessage}"`);
+      }
+    }
+
+    setCurrentMessage('');
     setIsTyping(true);
     
     setTimeout(() => {
-      const responses = [
-        "Muito prazer! Qual é o seu principal objetivo com o inglês?",
-        "Entendi! Quando você gostaria de começar?",
-        "Perfeito! Nossa equipe entrará em contato em breve. Obrigada!"
-      ];
+      let response = "";
       
-      const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+      if (currentStage === 0) {
+        // Tentar capturar o nome
+        const extractedName = extractNameFromMessage(currentMessage);
+        if (extractedName) {
+          setLeadName(extractedName);
+          
+          // Buscar vendedores reais da escola
+          const schoolSellers = getSellersBySchool(schoolId).filter(s => s.active);
+          const currentSchool = schools.find(s => s.id === schoolId);
+          const fullSellerName = schoolSellers.length > 0 ? schoolSellers[0].name : 'Consultor';
+          const sellerFirstName = getFirstName(fullSellerName);
+          const schoolName = currentSchool?.name || 'Rockfeller Brasil';
+          
+          response = `Muito prazer, ${extractedName}! 😊 Meu nome é ${sellerFirstName} da ${schoolName}.\n\nPara te apresentar o curso ideal, você busca inglês para qual objetivo? É para você, para o trabalho, para os filhos? 😉`;
+          setCurrentStage(1);
+        } else {
+          response = "Não consegui identificar seu nome. Pode me dizer de novo como gostaria que eu te chamasse?";
+        }
+      } else if (currentStage === 1) {
+        response = `Entendi! E quando você gostaria de começar? Está procurando algo para começar logo?`;
+        setCurrentStage(2);
+      } else if (currentStage === 2) {
+        response = `Perfeito${leadName ? `, ${leadName}` : ''}! Que tal conversarmos melhor sobre isso? Nossa equipe entrará em contato em breve para te mostrar nossas opções. Obrigada! 😊`;
+        setCurrentStage(3);
+      } else {
+        response = "Obrigada pelas informações! Nossa equipe entrará em contato em breve.";
+      }
+      
+      // Aplicar substituição de placeholders
+      const cleanResponse = replacePlaceholders(response, leadName);
       
       const aiMessage: Message = {
         type: 'ai',
-        content: randomResponse,
+        content: cleanResponse,
         timestamp: new Date()
       };
       
@@ -86,6 +200,40 @@ Como você gostaria que eu te chamasse?`;
       setIsTyping(false);
       setLeadScore(prev => Math.min(100, prev + 25));
     }, 2000);
+  };
+
+  // Função para extrair apenas o primeiro nome
+  const getFirstName = (fullName: string): string => {
+    if (!fullName) return fullName;
+    const nameParts = fullName.trim().split(' ');
+    return nameParts[0];
+  };
+
+  // Função para substituir placeholders na resposta da IA
+  const replacePlaceholders = (message: string, leadName: string): string => {
+    let cleanMessage = message;
+    
+    // Buscar vendedores reais da escola
+    const schoolSellers = getSellersBySchool(schoolId).filter(s => s.active);
+    const currentSchool = schools.find(s => s.id === schoolId);
+    
+    // Usar primeiro vendedor ativo ou nome padrão, e extrair apenas o primeiro nome
+    const fullSellerName = schoolSellers.length > 0 ? schoolSellers[0].name : 'Consultor da Rockfeller';
+    const sellerFirstName = getFirstName(fullSellerName);
+    const schoolName = currentSchool?.name || 'Rockfeller Brasil';
+    
+    // Substituir placeholders comuns usando apenas o primeiro nome
+    cleanMessage = cleanMessage.replace(/\[Seu Nome\]/g, sellerFirstName);
+    cleanMessage = cleanMessage.replace(/\[NOME_VENDEDOR\]/g, sellerFirstName);
+    cleanMessage = cleanMessage.replace(/\[VENDEDOR\]/g, sellerFirstName);
+    cleanMessage = cleanMessage.replace(/\[CONSULTOR\]/g, sellerFirstName);
+    cleanMessage = cleanMessage.replace(/\[NOME\]/g, leadName || '[NOME]');
+    cleanMessage = cleanMessage.replace(/\[ESCOLA\]/g, schoolName);
+    cleanMessage = cleanMessage.replace(/\[NOME_ESCOLA\]/g, schoolName);
+    cleanMessage = cleanMessage.replace(/Rockfeller Brasil/g, schoolName);
+    
+    console.log(`[EmbedChat] Placeholders substituídos: "${message}" -> "${cleanMessage}"`);
+    return cleanMessage;
   };
 
   const getScoreColor = (score: number) => {
@@ -105,11 +253,25 @@ Como você gostaria que eu te chamasse?`;
               Qualificação Rockfeller
             </h1>
           </div>
-          <div className="text-center">
-            <p className="text-xs text-slate-400">Score</p>
-            <p className={`text-lg font-bold ${getScoreColor(leadScore)}`}>
-              {leadScore}/100
-            </p>
+          <div className="flex items-center space-x-3">
+            {/* Botão Nova Conversa - visível quando há conversa ativa */}
+            {conversationStarted && (
+              <Button
+                onClick={startNewConversation}
+                variant="outline"
+                size="sm"
+                className="bg-slate-700/50 border-slate-600 text-slate-300 hover:bg-slate-600/50 hover:text-white"
+              >
+                <RotateCcw size={12} className="mr-1" />
+                Nova
+              </Button>
+            )}
+            <div className="text-center">
+              <p className="text-xs text-slate-400">Score</p>
+              <p className={`text-lg font-bold ${getScoreColor(leadScore)}`}>
+                {leadScore}/100
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -163,21 +325,64 @@ Como você gostaria que eu te chamasse?`;
                 Iniciar Conversa
               </Button>
             ) : (
-              <div className="flex space-x-2">
-                <Input
-                  value={currentMessage}
-                  onChange={(e) => setCurrentMessage(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                  placeholder="Digite sua mensagem..."
-                  className="bg-slate-700/50 border-slate-600 text-white placeholder-slate-400"
-                />
-                <Button
-                  onClick={handleSendMessage}
-                  disabled={!currentMessage.trim() || isTyping}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  <Send size={18} />
-                </Button>
+              <div className="space-y-2">
+                <div className="flex space-x-2">
+                  <Input
+                    value={currentMessage}
+                    onChange={(e) => setCurrentMessage(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                    placeholder="Digite sua mensagem..."
+                    className="bg-slate-700/50 border-slate-600 text-white placeholder-slate-400"
+                  />
+                  <Button
+                    onClick={handleSendMessage}
+                    disabled={!currentMessage.trim() || isTyping}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Send size={18} />
+                  </Button>
+                </div>
+                
+                {/* Botões de ação */}
+                <div className="flex space-x-2">
+                  <Button
+                    onClick={startNewConversation}
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 border-blue-500/30 text-blue-400 hover:bg-blue-500/10 hover:border-blue-500/50"
+                  >
+                    <RotateCcw className="mr-1" size={14} />
+                    Nova Conversa
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setConversationStarted(false);
+                      setCurrentMessage('');
+                      setLeadScore(0);
+                      setIsTyping(false);
+                      setLeadName('');
+                      setCurrentStage(0);
+                      setMessages([
+                        {
+                          type: 'system',
+                          content: 'Chat de qualificação carregado! Clique em "Iniciar Conversa" para começar.',
+                          timestamp: new Date()
+                        }
+                      ]);
+                      
+                      toast({
+                        title: "Conversa Encerrada",
+                        description: "Conversa finalizada",
+                      });
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 border-red-500/30 text-red-400 hover:bg-red-500/10 hover:border-red-500/50"
+                  >
+                    <X className="mr-1" size={14} />
+                    Encerrar
+                  </Button>
+                </div>
               </div>
             )}
           </div>

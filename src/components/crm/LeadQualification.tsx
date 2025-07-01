@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Send, Bot, Settings, Brain, FileText, X, MessageCircle, Code, Copy, ExternalLink } from 'lucide-react';
+import { Send, Bot, Settings, Brain, FileText, X, MessageCircle, Code, Copy, ExternalLink, RotateCcw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuth, Seller, QualificationConversation } from '@/contexts/AuthContext';
@@ -106,12 +106,49 @@ export const LeadQualification = () => {
     }
   };
 
+  // Função para iniciar uma nova conversa
+  const startNewConversation = async () => {
+    if (!user) return;
+
+    // Se existe conversa atual, finalizar ela primeiro
+    if (currentConversation) {
+      await updateQualificationConversation(currentConversation.id, {
+        status: 'completed'
+      });
+    }
+
+    // Resetar todos os estados para iniciar nova conversa
+    setCurrentConversation(null);
+    setConversationStarted(false);
+    setWaitingForResponse(false);
+    setCurrentStage(0);
+    setLeadScore(0);
+    setStageScores({});
+    setAssignedSeller(null);
+    setLeadName('');
+    setLeadPhone('');
+    setLeadEmail('');
+    setCurrentMessage('');
+    setMessages([
+      {
+        type: 'system',
+        content: 'Sistema de qualificação IA pronto. Clique em "Iniciar Nova Conversa" para começar.',
+        timestamp: new Date()
+      }
+    ]);
+
+    toast({
+      title: "Nova Conversa",
+      description: "Pronto para iniciar uma nova qualificação de lead",
+    });
+  };
+
   // Estágios de qualificação com coleta de nome
   const qualificationStages: QualificationStage[] = [
     {
       id: 'name',
       name: 'Identificação',
-      question: 'Oi! Como você gostaria que eu te chamasse? Qual é o seu nome?',
+      question: 'Oi! Qual é o seu nome?',
       keywords: ['nome', 'chamo', 'sou', 'eu', 'me'],
       followUpQuestions: [],
       maxScore: 20
@@ -260,62 +297,32 @@ export const LeadQualification = () => {
     setCurrentStage(0);
     setWaitingForResponse(false); // Começa sem esperar resposta para a apresentação
 
+    // Buscar vendedores reais da escola
+    const schoolSellers = getSellersBySchool(user.schoolId).filter(s => s.active);
+    
     // Buscar próximo vendedor disponível usando distribuição equitativa
     const currentSeller = getNextAvailableSeller(user.schoolId);
-    const sellerToUse = currentSeller || { name: 'Consultor' };
+    
+    // Se não houver vendedores cadastrados, usar um padrão, senão usar o primeiro vendedor ativo
+    const sellerToUse = currentSeller || (schoolSellers.length > 0 ? schoolSellers[0] : { name: 'Consultor da Rockfeller' });
     
     // Armazenar o vendedor atribuído para esta conversa
-    setAssignedSeller(currentSeller);
+    setAssignedSeller(currentSeller || (schoolSellers.length > 0 ? schoolSellers[0] : null));
     
-    // Função para extrair o primeiro nome ou nome composto
-    const getFirstName = (fullName: string) => {
-      const nameParts = fullName.trim().split(' ');
-      
-      // Lista de conectores que indicam nomes compostos
-      const compositeConnectors = ['de', 'da', 'do', 'dos', 'das', 'e'];
-      
-      // Se tem apenas um nome, retorna ele
-      if (nameParts.length === 1) {
-        return nameParts[0];
-      }
-      
-      // Se o segundo elemento é um conector, é nome composto
-      if (nameParts.length >= 2 && compositeConnectors.includes(nameParts[1].toLowerCase())) {
-        return `${nameParts[0]} ${nameParts[1]} ${nameParts[2] || ''}`.trim();
-      }
-      
-      // Casos especiais de nomes compostos comuns
-      const compositeFirstNames = [
-        'ana', 'maria', 'josé', 'joão', 'carlos', 'luiz', 'antonio', 'francisco',
-        'pedro', 'paulo', 'marcos', 'andre', 'rafael', 'daniel', 'gabriel'
-      ];
-      
-      if (nameParts.length >= 2) {
-        const firstName = nameParts[0].toLowerCase();
-        const secondName = nameParts[1].toLowerCase();
-        
-        // Verifica se é um nome composto comum (ex: Ana Paula, José Carlos)
-        if (compositeFirstNames.includes(firstName) && 
-            (secondName.length <= 6 || compositeFirstNames.includes(secondName))) {
-          return `${nameParts[0]} ${nameParts[1]}`;
-        }
-      }
-      
-      // Caso padrão: retorna apenas o primeiro nome
-      return nameParts[0];
-    };
+    // Função para extrair apenas o primeiro nome (removida para evitar duplicação - usando a função global)
     
+    // Usar apenas o primeiro nome do vendedor
     const sellerFirstName = getFirstName(sellerToUse.name);
     
-    // Mensagem de apresentação inicial
+    // Mensagem de apresentação inicial com foco em pedir o nome
     const schoolName = currentSchool?.name || 'Rockfeller Brasil';
     const introMessage = {
       type: 'ai' as const,
-      content: `Olá, tudo bem? 😊
+      content: `Olá! Tudo bem? 😊
 
 Eu sou ${sellerFirstName} da ${schoolName}! 
 
-Como posso te ajudar hoje?`,
+Antes de começarmos, Qual é o seu nome?`,
       timestamp: new Date()
     };
 
@@ -328,7 +335,7 @@ Como posso te ajudar hoje?`,
       leadPhone: '',
       leadEmail: '',
       messages: initialMessages,
-      stage: 0,
+      stage: 0, // Começar direto no estágio do nome
       score: 0,
       stageScores: {},
       schoolId: user.schoolId,
@@ -339,6 +346,7 @@ Como posso te ajudar hoje?`,
     const newConversation = await createQualificationConversation(conversationData);
     if (newConversation) {
       setCurrentConversation(newConversation);
+      setWaitingForResponse(true); // Aguardando resposta com o nome
     }
   };
 
@@ -389,16 +397,21 @@ Como posso te ajudar hoje?`,
     setMessages(updatedMessages);
 
     // Capturar nome se estivermos no primeiro estágio
+    let extractedNameForThisMessage = '';
     if (currentStage === 0 && !leadName) {
-      const extractedName = extractNameFromMessage(currentMessage);
-      if (extractedName) {
-        setLeadName(extractedName);
+      extractedNameForThisMessage = extractNameFromMessage(currentMessage);
+      if (extractedNameForThisMessage) {
+        console.log(`[LeadQualification] Nome capturado: "${extractedNameForThisMessage}" - salvando no estado`);
+        setLeadName(extractedNameForThisMessage);
         
         // Atualizar conversa com o nome
         await updateQualificationConversation(currentConversation.id, {
-          leadName: extractedName,
+          leadName: extractedNameForThisMessage,
           messages: updatedMessages
         });
+        console.log(`[LeadQualification] Nome "${extractedNameForThisMessage}" salvo na conversa`);
+      } else {
+        console.log(`[LeadQualification] Nome NÃO capturado da mensagem: "${currentMessage}"`);
       }
     }
 
@@ -406,14 +419,46 @@ Como posso te ajudar hoje?`,
       // Mostrar indicador de digitação enquanto processa
       setIsTyping(true);
       
-      // Analisar resposta e gerar próxima pergunta
-      const response = await analyzeResponseAndGenerateNext(currentMessage, currentStage);
+      // Verificar se estamos no estágio de captura de nome e acabamos de capturar
+      let useAI = true;
+      let response;
+      
+      // Se acabamos de capturar o nome no estágio 0, usar resposta estruturada
+      if (currentStage === 0 && extractedNameForThisMessage) {
+        // Resposta de boas-vindas personalizada seguida da próxima pergunta
+        response = {
+          message: `Muito prazer, ${extractedNameForThisMessage}! 😊\n\n${qualificationStages[1].question.replace('[NOME]', extractedNameForThisMessage)}`,
+          scoreIncrease: qualificationStages[0].maxScore,
+          nextStage: 1,
+          completed: false
+        };
+        useAI = false;
+        console.log(`[LeadQualification] Usando resposta estruturada com nome: "${extractedNameForThisMessage}"`);
+      }
+      
+      // Se não usou resposta estruturada, usar IA
+      if (useAI) {
+        // Passar o nome capturado para a IA usar no prompt
+        response = await analyzeResponseAndGenerateNext(currentMessage, currentStage, extractedNameForThisMessage);
+      }
       
       // Simular tempo de digitação antes de mostrar resposta
       setTimeout(async () => {
+        // Buscar vendedores reais da escola para usar nome correto
+        const schoolSellers = getSellersBySchool(user.schoolId).filter(s => s.active);
+        const schoolName = currentSchool?.name || 'Rockfeller Brasil';
+        
+        // Usar vendedor atribuído ou primeiro vendedor ativo da escola
+        const actualSeller = assignedSeller || (schoolSellers.length > 0 ? schoolSellers[0] : null);
+        const sellerName = actualSeller?.name || 'Consultor da Rockfeller';
+        
+        // Usar o nome capturado nesta mensagem ou o leadName do estado
+        const currentLeadName = extractedNameForThisMessage || leadName;
+        const cleanMessage = replacePlaceholders(response.message, currentLeadName, sellerName, schoolName);
+        
         const aiMessage = {
           type: 'ai' as const,
-          content: response.message,
+          content: cleanMessage,
           timestamp: new Date()
         };
         
@@ -528,33 +573,57 @@ Tem mais alguma dúvida sobre nossos cursos?`,
   // Função para extrair nome da mensagem
   const extractNameFromMessage = (message: string): string => {
     const text = message.trim();
+    console.log(`[DEBUG extractNameFromMessage] Analisando mensagem: "${text}"`);
     
-    // Padrões comuns para capturar nome
+    // Lista de palavras a ignorar
+    const stopWords = ['oi', 'olá', 'ola', 'hey', 'bom', 'dia', 'tarde', 'noite', 'tudo', 'bem', 'boa', 'meu', 'nome', 'é'];
+    
+    // Primeiro, tentar padrões específicos
     const patterns = [
       /(?:me chamo|sou|nome é|é)\s+([A-Za-zÀ-ÿ\s]+)/i,
       /(?:meu nome é|eu sou)\s+([A-Za-zÀ-ÿ\s]+)/i,
-      /^([A-Za-zÀ-ÿ\s]+)$/i, // Nome simples
     ];
     
     for (const pattern of patterns) {
       const match = text.match(pattern);
       if (match && match[1]) {
-        // Limpar e formatar o nome
         const name = match[1].trim()
-          .replace(/[^\w\sÀ-ÿ]/g, '') // Remove caracteres especiais
-          .replace(/\s+/g, ' ') // Remove espaços duplos
+          .replace(/[^\w\sÀ-ÿ]/g, '')
+          .replace(/\s+/g, ' ')
           .split(' ')
           .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
           .join(' ');
         
-        // Validar se parece um nome (não muito longo, não é saudação, etc.)
-        if (name.length > 1 && name.length < 50 && 
-            !['oi', 'olá', 'bom dia', 'boa tarde', 'boa noite'].includes(name.toLowerCase())) {
+        if (name.length > 1 && name.length < 50) {
+          console.log(`[LeadQualification] Nome extraído via padrão: "${name}"`);
           return name;
         }
       }
     }
     
+    // Se não encontrou com padrões, tentar texto simples (como "WADE")
+    // Remover stop words e verificar se sobrou algo que parece nome
+    const words = text.toLowerCase().split(/\s+/);
+    console.log(`[DEBUG extractNameFromMessage] Palavras encontradas: ${JSON.stringify(words)}`);
+    
+    const filteredWords = words.filter(word => 
+      word.length > 1 && 
+      !stopWords.includes(word) &&
+      /^[a-záàâãéèêíìîóòôõúùûç]+$/i.test(word) // Apenas letras
+    );
+    console.log(`[DEBUG extractNameFromMessage] Palavras filtradas: ${JSON.stringify(filteredWords)}`);
+    
+    if (filteredWords.length > 0 && filteredWords.length <= 3) {
+      // Pegar até 2 palavras para nome composto
+      const name = filteredWords.slice(0, 2)
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+      
+      console.log(`[LeadQualification] Nome extraído via texto simples: "${name}" (original: "${text}")`);
+      return name;
+    }
+    
+    console.log(`[LeadQualification] Não conseguiu extrair nome de: "${text}"`);
     return '';
   };
 
@@ -652,7 +721,7 @@ Até amanhã!`;
   };
 
   // Analisar resposta e gerar próxima pergunta
-  const analyzeResponseAndGenerateNext = async (userResponse: string, stageIndex: number) => {
+  const analyzeResponseAndGenerateNext = async (userResponse: string, stageIndex: number, capturedNameInThisMessage?: string) => {
     const currentStageData = qualificationStages[stageIndex];
     
     // Construir contexto RAG
@@ -661,8 +730,28 @@ Até amanhã!`;
       ragContext = ragFiles.map(file => file.content).join('\n\n');
     }
 
+    // Obter informações do vendedor e escola usando vendedores reais
+    const schoolSellers = getSellersBySchool(user.schoolId).filter(s => s.active);
+    const schoolName = currentSchool?.name || 'Rockfeller Brasil';
+    
+    // Usar vendedor atribuído ou primeiro vendedor ativo da escola
+    const actualSeller = assignedSeller || (schoolSellers.length > 0 ? schoolSellers[0] : null);
+    const sellerName = actualSeller?.name || 'Consultor da Rockfeller';
+    
+    // Usar o nome capturado nesta mensagem se disponível, senão usar o leadName do estado
+    const currentLeadNameForPrompt = capturedNameInThisMessage || leadName;
+
     // Prompt conversacional e focado no agendamento
-    const analysisPrompt = `Você é um consultor de vendas amigável e conversacional de uma escola de inglês.
+    const analysisPrompt = `Você é ${sellerName}, um consultor de vendas amigável e conversacional da ${schoolName}.
+
+INFORMAÇÕES DO LEAD:
+- Nome: ${currentLeadNameForPrompt || 'Não capturado ainda'}
+- Estágio: ${currentStageData.name}
+
+SUA IDENTIDADE:
+- Seu nome: ${sellerName}
+- Você trabalha na: ${schoolName}
+- Você é um consultor experiente e amigável
 
 CONTEXTO DA EMPRESA:
 ${ragContext}
@@ -680,7 +769,9 @@ RESPOSTA DO LEAD: ${userResponse}
 SEU OBJETIVO: Aquecer o lead e conseguir um agendamento para conversa com vendedor humano.
 
 INSTRUÇÕES IMPORTANTES:
-- Seja natural, amigável e conversacional
+- Você é ${sellerName} da ${schoolName} - use sempre essa identidade
+- ${currentLeadNameForPrompt ? `SEMPRE use o nome ${currentLeadNameForPrompt} nas suas respostas para personalizar` : 'Se souber o nome do lead, sempre use nas respostas'}
+- NUNCA use placeholders como [Seu Nome] ou [NOME] - use os nomes reais sempre
 - SEMPRE responda às perguntas e objeções do lead
 - Se o lead questionar algo (como "já não estamos conversando aqui?"), responda de forma inteligente
 - NÃO ignore questionamentos ou objeções
@@ -876,6 +967,35 @@ Prefere uma conversa online ou presencial na nossa escola?`;
       title: "Configurado!",
       description: `${apiType} configurado com sucesso`,
     });
+  };
+
+  // Função para extrair apenas o primeiro nome
+  const getFirstName = (fullName: string): string => {
+    if (!fullName) return fullName;
+    const nameParts = fullName.trim().split(' ');
+    return nameParts[0];
+  };
+
+  // Função para substituir placeholders na resposta da IA
+  const replacePlaceholders = (message: string, leadName: string, sellerName: string, schoolName: string): string => {
+    let cleanMessage = message;
+    
+    // Usar apenas o primeiro nome do vendedor
+    const sellerFirstName = getFirstName(sellerName);
+    
+    // Substituir placeholders comuns
+    cleanMessage = cleanMessage.replace(/\[Seu Nome\]/g, sellerFirstName);
+    cleanMessage = cleanMessage.replace(/\[NOME_VENDEDOR\]/g, sellerFirstName);
+    cleanMessage = cleanMessage.replace(/\[VENDEDOR\]/g, sellerFirstName);
+    cleanMessage = cleanMessage.replace(/\[CONSULTOR\]/g, sellerFirstName);
+    cleanMessage = cleanMessage.replace(/\[NOME\]/g, leadName || '[NOME]');
+    cleanMessage = cleanMessage.replace(/\[ESCOLA\]/g, schoolName);
+    cleanMessage = cleanMessage.replace(/\[NOME_ESCOLA\]/g, schoolName);
+    cleanMessage = cleanMessage.replace(/Rockfeller Brasil/g, schoolName);
+    
+    console.log(`[LeadQualification] DEBUG Placeholders - leadName recebido: "${leadName}", sellerName: "${sellerName}"`);
+    console.log(`[LeadQualification] Placeholders substituídos: "${message}" -> "${cleanMessage}"`);
+    return cleanMessage;
   };
 
   // Cor do score
@@ -1171,6 +1291,19 @@ Prefere uma conversa online ou presencial na nossa escola?`;
             <h3 className="text-lg font-medium text-white">Conversa com Lead</h3>
           </div>
           <div className="flex items-center space-x-3">
+            {/* Botão Nova Conversa - visível quando há conversa ativa */}
+            {conversationStarted && (
+              <Button
+                onClick={startNewConversation}
+                variant="outline"
+                size="sm"
+                className="bg-slate-700/50 border-slate-600 text-slate-300 hover:bg-slate-600/50 hover:text-white"
+              >
+                <RotateCcw size={14} className="mr-1" />
+                Nova Conversa
+              </Button>
+            )}
+            
             {/* Botão de Embed */}
             <Dialog open={showEmbedDialog} onOpenChange={setShowEmbedDialog}>
               <DialogTrigger asChild>
@@ -1364,7 +1497,7 @@ Prefere uma conversa online ou presencial na nossa escola?`;
             }`}
           >
             <Brain className="mr-2" size={16} />
-            Iniciar Qualificação Inteligente
+            Iniciar Nova Conversa
           </Button>
         ) : (
           <div className="space-y-2">
@@ -1398,25 +1531,48 @@ Prefere uma conversa online ou presencial na nossa escola?`;
               </Button>
             </div>
             
-            {/* Botão para encerrar conversa manualmente */}
-            <Button
-              onClick={() => {
-                setConversationStarted(false);
-                setWaitingForResponse(false);
-                setCurrentMessage('');
-                toast({
-                  title: "Conversa Encerrada",
-                  description: "Conversa finalizada manualmente",
-                });
-              }}
-              variant="outline"
-              className={`w-full border-red-500/30 text-red-400 hover:bg-red-500/10 hover:border-red-500/50 ${
-                isMobile ? 'h-10 text-sm' : ''
-              }`}
-            >
-              <X className="mr-2" size={isMobile ? 14 : 16} />
-              Encerrar Conversa
-            </Button>
+            {/* Botões de ação */}
+            <div className="flex space-x-2">
+              {/* Botão para nova conversa */}
+              <Button
+                onClick={startNewConversation}
+                variant="outline"
+                className={`flex-1 border-blue-500/30 text-blue-400 hover:bg-blue-500/10 hover:border-blue-500/50 ${
+                  isMobile ? 'h-10 text-sm' : ''
+                }`}
+              >
+                <RotateCcw className="mr-2" size={isMobile ? 14 : 16} />
+                Nova Conversa
+              </Button>
+              
+              {/* Botão para encerrar conversa atual */}
+              <Button
+                onClick={() => {
+                  setConversationStarted(false);
+                  setWaitingForResponse(false);
+                  setCurrentMessage('');
+                  
+                  // Marcar conversa atual como completada
+                  if (currentConversation) {
+                    updateQualificationConversation(currentConversation.id, {
+                      status: 'completed'
+                    });
+                  }
+                  
+                  toast({
+                    title: "Conversa Encerrada",
+                    description: "Conversa finalizada manualmente",
+                  });
+                }}
+                variant="outline"
+                className={`flex-1 border-red-500/30 text-red-400 hover:bg-red-500/10 hover:border-red-500/50 ${
+                  isMobile ? 'h-10 text-sm' : ''
+                }`}
+              >
+                <X className="mr-2" size={isMobile ? 14 : 16} />
+                Encerrar
+              </Button>
+            </div>
           </div>
         )}
       </Card>

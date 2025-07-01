@@ -189,7 +189,18 @@ const MOCK_SCHOOLS: School[] = [
   }
 ];
 
-const MOCK_SELLERS: Seller[] = [];
+const MOCK_SELLERS: Seller[] = [
+  {
+    id: 'seller_test_1',
+    name: 'Ricardo Silva Santos',
+    email: 'ricardo@rockfeller.com.br',
+    phone: '(11) 9 9999-9999',
+    role: 'Consultor de Vendas',
+    schoolId: '1',
+    active: true,
+    createdAt: new Date('2024-01-01')
+  }
+];
 
 // Fontes de leads padrão (será criada uma cópia para cada escola)
 const DEFAULT_LEAD_SOURCES = [
@@ -261,7 +272,10 @@ const MOCK_LEAD_SOURCES: LeadSource[] = createSedeLeadSources();
 
 // Função para obter senhas do localStorage (em produção, usar hash/criptografia)
 const getMockPasswords = (): Record<string, string> => {
-  const defaultPasswords = { 'admin@rockfeller.com.br': 'admin123' };
+  const defaultPasswords = { 
+    'admin@rockfeller.com.br': 'admin123',
+    'ricardo@rockfeller.com.br': 'ricardo123'
+  };
   try {
     const savedPasswords = localStorage.getItem('mock_passwords');
     if (savedPasswords) {
