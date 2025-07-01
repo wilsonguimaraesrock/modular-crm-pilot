@@ -170,7 +170,7 @@ Antes de começarmos, Qual é o seu nome?`;
           const sellerFirstName = getFirstName(fullSellerName);
           const schoolName = currentSchool?.name || 'Rockfeller Brasil';
           
-          response = `Muito prazer, ${extractedNameForThisMessage}! 😊 Meu nome é ${sellerFirstName} da ${schoolName}.\n\nPara te apresentar o curso ideal, você busca inglês para qual objetivo? É para você, para o trabalho, para os filhos? 😉`;
+          response = `Muito prazer, ${extractedNameForThisMessage}! 😊\n\nMe conta, qual é o seu principal objetivo com o inglês?`;
           setCurrentStage(1);
         } else {
           response = "Não consegui identificar seu nome. Pode me dizer de novo como gostaria que eu te chamasse?";
@@ -179,15 +179,26 @@ Antes de começarmos, Qual é o seu nome?`;
         response = `Entendi! E quando você gostaria de começar? Está procurando algo para começar logo?`;
         setCurrentStage(2);
       } else if (currentStage === 2) {
-        response = `Perfeito${leadName ? `, ${leadName}` : ''}! Que tal conversarmos melhor sobre isso? Nossa equipe entrará em contato em breve para te mostrar nossas opções. Obrigada! 😊`;
+        // Usar o nome capturado nesta mensagem ou o leadName já salvo
+        const currentLeadName = extractedNameForThisMessage || leadName;
+        console.log(`[EmbedChat] DEBUG - Nome para mensagem final: "${currentLeadName}" (extractedNameForThisMessage: "${extractedNameForThisMessage}", leadName: "${leadName}")`);
+        
+        const greeting = currentLeadName ? `Perfeito ${currentLeadName}!` : 'Perfeito!';
+        response = `${greeting} Que tal conversarmos melhor sobre isso? Nossa equipe entrará em contato em breve para te mostrar nossas opções. Obrigada! 😊`;
         setCurrentStage(3);
       } else {
         response = "Obrigada pelas informações! Nossa equipe entrará em contato em breve.";
       }
       
       // Aplicar substituição de placeholders usando nome capturado ou do estado
-      const currentLeadName = extractedNameForThisMessage || leadName;
-      const cleanResponse = replacePlaceholders(response, currentLeadName);
+      const finalLeadName = extractedNameForThisMessage || leadName;
+      console.log(`[EmbedChat] DEBUG - extractedNameForThisMessage: "${extractedNameForThisMessage}"`);
+      console.log(`[EmbedChat] DEBUG - leadName do estado: "${leadName}"`);
+      console.log(`[EmbedChat] DEBUG - finalLeadName: "${finalLeadName}"`);
+      console.log(`[EmbedChat] DEBUG - response ANTES replacePlaceholders: "${response}"`);
+      
+      const cleanResponse = replacePlaceholders(response, finalLeadName);
+      console.log(`[EmbedChat] DEBUG - cleanResponse APÓS replacePlaceholders: "${cleanResponse}"`);
       
       const aiMessage: Message = {
         type: 'ai',
@@ -226,7 +237,19 @@ Antes de começarmos, Qual é o seu nome?`;
     cleanMessage = cleanMessage.replace(/\[NOME_VENDEDOR\]/g, sellerFirstName);
     cleanMessage = cleanMessage.replace(/\[VENDEDOR\]/g, sellerFirstName);
     cleanMessage = cleanMessage.replace(/\[CONSULTOR\]/g, sellerFirstName);
-    cleanMessage = cleanMessage.replace(/\[NOME\]/g, leadName || '[NOME]');
+    
+    // Substituir [NOME] - se não tiver nome, usar alternativas inteligentes
+    if (leadName) {
+      cleanMessage = cleanMessage.replace(/\[NOME\]/g, leadName);
+    } else {
+      // Remover partes específicas que ficam estranhas sem nome
+      cleanMessage = cleanMessage
+        .replace(/Legal \[NOME\]! /g, 'Legal! ')
+        .replace(/Perfeito \[NOME\]! /g, 'Perfeito! ')
+        .replace(/Ótimo \[NOME\]! /g, 'Ótimo! ')
+        .replace(/\[NOME\]/g, 'você');
+    }
+    
     cleanMessage = cleanMessage.replace(/\[ESCOLA\]/g, schoolName);
     cleanMessage = cleanMessage.replace(/\[NOME_ESCOLA\]/g, schoolName);
     cleanMessage = cleanMessage.replace(/Rockfeller Brasil/g, schoolName);

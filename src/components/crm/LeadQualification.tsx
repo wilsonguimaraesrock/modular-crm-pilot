@@ -354,6 +354,8 @@ Antes de começarmos, Qual é o seu nome?`,
   const handleSendMessage = async () => {
     if (!currentMessage.trim() || !currentConversation) return;
     
+    console.log(`[LeadQualification] DEBUG INÍCIO handleSendMessage - leadName atual: "${leadName}", currentStage: ${currentStage}, currentMessage: "${currentMessage}"`);
+    
     // Se ainda não está esperando resposta (durante apresentação), apenas responder cordialmente
     if (!waitingForResponse && conversationStarted) {
       const userMessage = {
@@ -396,12 +398,20 @@ Antes de começarmos, Qual é o seu nome?`,
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
 
-    // Capturar nome se estivermos no primeiro estágio
+    // Tentar capturar nome apenas no primeiro estágio
     let extractedNameForThisMessage = '';
     if (currentStage === 0 && !leadName) {
+      console.log(`[LeadQualification] *** TENTATIVA DE CAPTURA DE NOME ***`);
+      console.log(`[LeadQualification] - currentStage: ${currentStage}`);
+      console.log(`[LeadQualification] - leadName atual: "${leadName}"`);
+      console.log(`[LeadQualification] - currentMessage: "${currentMessage}"`);
+      
       extractedNameForThisMessage = extractNameFromMessage(currentMessage);
+      
+      console.log(`[LeadQualification] - Nome extraído: "${extractedNameForThisMessage}"`);
+      
       if (extractedNameForThisMessage) {
-        console.log(`[LeadQualification] Nome capturado: "${extractedNameForThisMessage}" - salvando no estado`);
+        console.log(`[LeadQualification] ✅ Nome capturado: "${extractedNameForThisMessage}" - salvando no estado`);
         setLeadName(extractedNameForThisMessage);
         
         // Atualizar conversa com o nome
@@ -409,9 +419,9 @@ Antes de começarmos, Qual é o seu nome?`,
           leadName: extractedNameForThisMessage,
           messages: updatedMessages
         });
-        console.log(`[LeadQualification] Nome "${extractedNameForThisMessage}" salvo na conversa`);
+        console.log(`[LeadQualification] ✅ Nome "${extractedNameForThisMessage}" salvo na conversa`);
       } else {
-        console.log(`[LeadQualification] Nome NÃO capturado da mensagem: "${currentMessage}"`);
+        console.log(`[LeadQualification] ❌ Nome NÃO capturado da mensagem: "${currentMessage}"`);
       }
     }
 
@@ -427,7 +437,7 @@ Antes de começarmos, Qual é o seu nome?`,
       if (currentStage === 0 && extractedNameForThisMessage) {
         // Resposta de boas-vindas personalizada seguida da próxima pergunta
         response = {
-          message: `Muito prazer, ${extractedNameForThisMessage}! 😊\n\n${qualificationStages[1].question.replace('[NOME]', extractedNameForThisMessage)}`,
+          message: `Muito prazer, ${extractedNameForThisMessage}! 😊\n\nMe conta, qual é o seu principal objetivo com o inglês?`,
           scoreIncrease: qualificationStages[0].maxScore,
           nextStage: 1,
           completed: false
@@ -438,8 +448,9 @@ Antes de começarmos, Qual é o seu nome?`,
       
       // Se não usou resposta estruturada, usar IA
       if (useAI) {
-        // Passar o nome capturado para a IA usar no prompt
-        response = await analyzeResponseAndGenerateNext(currentMessage, currentStage, extractedNameForThisMessage);
+        // Passar o nome capturado nesta mensagem ou o leadName já salvo para a IA usar no prompt
+        const nameToUse = extractedNameForThisMessage || leadName;
+        response = await analyzeResponseAndGenerateNext(currentMessage, currentStage, nameToUse);
       }
       
       // Simular tempo de digitação antes de mostrar resposta
@@ -454,7 +465,13 @@ Antes de começarmos, Qual é o seu nome?`,
         
         // Usar o nome capturado nesta mensagem ou o leadName do estado
         const currentLeadName = extractedNameForThisMessage || leadName;
+        console.log(`[LeadQualification] DEBUG - extractedNameForThisMessage: "${extractedNameForThisMessage}"`);
+        console.log(`[LeadQualification] DEBUG - leadName do estado: "${leadName}"`);
+        console.log(`[LeadQualification] DEBUG - currentLeadName final: "${currentLeadName}"`);
+        console.log(`[LeadQualification] DEBUG - response.message ANTES replacePlaceholders: "${response.message}"`);
+        
         const cleanMessage = replacePlaceholders(response.message, currentLeadName, sellerName, schoolName);
+        console.log(`[LeadQualification] DEBUG - cleanMessage APÓS replacePlaceholders: "${cleanMessage}"`);
         
         const aiMessage = {
           type: 'ai' as const,
@@ -518,7 +535,9 @@ Antes de começarmos, Qual é o seu nome?`,
 
   // Processar resposta para agendamento
   const handleSchedulingMessage = async () => {
-    if (!currentMessage.trim() || !currentConversation || !leadName) return;
+    if (!currentMessage.trim() || !currentConversation) return;
+    
+    console.log(`[LeadQualification] Processando agendamento - leadName: "${leadName}", currentMessage: "${currentMessage}"`);
     
     // Adicionar mensagem do usuário
     const userMessage = {
@@ -770,8 +789,8 @@ SEU OBJETIVO: Aquecer o lead e conseguir um agendamento para conversa com vended
 
 INSTRUÇÕES IMPORTANTES:
 - Você é ${sellerName} da ${schoolName} - use sempre essa identidade
-- ${currentLeadNameForPrompt ? `SEMPRE use o nome ${currentLeadNameForPrompt} nas suas respostas para personalizar` : 'Se souber o nome do lead, sempre use nas respostas'}
-- NUNCA use placeholders como [Seu Nome] ou [NOME] - use os nomes reais sempre
+- ${currentLeadNameForPrompt ? `SEMPRE use o nome "${currentLeadNameForPrompt}" nas suas respostas para personalizar` : 'Se souber o nome do lead, sempre use nas respostas'}
+- CRÍTICO: NUNCA use placeholders como [Seu Nome], [NOME], [NOME_LEAD] ou similares - SEMPRE use o nome real "${currentLeadNameForPrompt}" quando se referir ao lead
 - SEMPRE responda às perguntas e objeções do lead
 - Se o lead questionar algo (como "já não estamos conversando aqui?"), responda de forma inteligente
 - NÃO ignore questionamentos ou objeções
@@ -793,6 +812,14 @@ COMO RESPONDER:
 - Se a resposta for boa o suficiente, avance para próxima pergunta
 - Se precisar de mais info, faça UMA pergunta simples e aberta
 - Sempre seja positivo e encorajador
+
+EXEMPLOS DE COMO USAR O NOME CORRETAMENTE:
+${currentLeadNameForPrompt ? `
+- CORRETO: "Perfeito ${currentLeadNameForPrompt}! Que tal conversarmos melhor sobre isso?"
+- CORRETO: "Entendi ${currentLeadNameForPrompt}! Baseado no que você disse..."
+- ERRADO: "Perfeito [NOME]! Que tal conversarmos..."
+- ERRADO: "Entendi [NOME_LEAD]! Baseado no que você disse..."
+` : ''}
 
 Responda com uma mensagem natural e completa (máximo 3 frases).`;
 
@@ -874,7 +901,13 @@ Responda com uma mensagem natural e completa (máximo 3 frases).`;
       nextStage = stageIndex + 1;
       if (nextStage >= qualificationStages.length) {
         // Chegou ao final dos estágios - preparar para agendamento
-        const schedulingMessage = `Ótimo ${leadName || 'pessoal'}! 😊
+        // Garantir que o nome seja obtido corretamente - incluir verificação mais ampla
+        const nameForScheduling = currentLeadNameForPrompt || leadName;
+        console.log(`[LeadQualification] DEBUG - Nome para agendamento: "${nameForScheduling}" (currentLeadNameForPrompt: "${currentLeadNameForPrompt}", leadName: "${leadName}")`);
+        
+        // Usar o nome se disponível, senão usar uma saudação genérica mas natural
+        const greeting = nameForScheduling ? `Ótimo ${nameForScheduling}!` : 'Ótimo!';
+        const schedulingMessage = `${greeting} 😊
 
 Baseado no que conversamos, vejo que você tem um perfil perfeito para nossos cursos. 
 
@@ -894,8 +927,17 @@ Prefere uma conversa online ou presencial na nossa escola?`;
       } else {
         // Personalizar pergunta com nome do lead
         let nextQuestion = qualificationStages[nextStage].question;
-        if (leadName) {
-          nextQuestion = nextQuestion.replace('[NOME]', leadName);
+        const nameForQuestion = currentLeadNameForPrompt || leadName;
+        
+        // SEMPRE substituir [NOME] - se não tiver nome, usar versão sem nome
+        if (nameForQuestion) {
+          nextQuestion = nextQuestion.replace(/\[NOME\]/g, nameForQuestion);
+        } else {
+          // Remover a parte que contém [NOME] se não tiver nome
+          nextQuestion = nextQuestion
+            .replace(/Legal \[NOME\]! /g, '')
+            .replace(/Perfeito \[NOME\]! /g, 'Perfeito! ')
+            .replace(/\[NOME\]/g, 'você');
         }
         
         return {
@@ -988,7 +1030,19 @@ Prefere uma conversa online ou presencial na nossa escola?`;
     cleanMessage = cleanMessage.replace(/\[NOME_VENDEDOR\]/g, sellerFirstName);
     cleanMessage = cleanMessage.replace(/\[VENDEDOR\]/g, sellerFirstName);
     cleanMessage = cleanMessage.replace(/\[CONSULTOR\]/g, sellerFirstName);
-    cleanMessage = cleanMessage.replace(/\[NOME\]/g, leadName || '[NOME]');
+    
+    // Substituir [NOME] - se não tiver nome, usar alternativas inteligentes
+    if (leadName) {
+      cleanMessage = cleanMessage.replace(/\[NOME\]/g, leadName);
+    } else {
+      // Remover partes específicas que ficam estranhas sem nome
+      cleanMessage = cleanMessage
+        .replace(/Legal \[NOME\]! /g, 'Legal! ')
+        .replace(/Perfeito \[NOME\]! /g, 'Perfeito! ')
+        .replace(/Ótimo \[NOME\]! /g, 'Ótimo! ')
+        .replace(/\[NOME\]/g, 'você');
+    }
+    
     cleanMessage = cleanMessage.replace(/\[ESCOLA\]/g, schoolName);
     cleanMessage = cleanMessage.replace(/\[NOME_ESCOLA\]/g, schoolName);
     cleanMessage = cleanMessage.replace(/Rockfeller Brasil/g, schoolName);
