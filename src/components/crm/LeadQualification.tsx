@@ -144,7 +144,9 @@ export const LeadQualification = () => {
 
   // Garantir que a página carregue mostrando o topo
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   }, []);
 
   // Carregar configurações e conversa ativa ao inicializar
@@ -180,7 +182,7 @@ export const LeadQualification = () => {
         setIsConfigured(true);
       } else {
         // Configurar API key padrão da OpenAI
-        const defaultApiKey = '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';
+        const defaultApiKey = '';
         setApiKey(defaultApiKey);
         localStorage.setItem(`gemini_api_key_${user.schoolId}`, defaultApiKey);
         setIsConfigured(true);
@@ -886,7 +888,8 @@ Prefere uma conversa online ou presencial na nossa escola?`;
 
   // Gerar código de embed
   const generateEmbedCode = () => {
-    const currentUrl = window.location.origin;
+    // Verificar se está no cliente antes de usar window
+    const currentUrl = typeof window !== 'undefined' ? window.location.origin : 'https://your-domain.com';
     const schoolId = user?.schoolId || '1';
     const embedUrl = `${currentUrl}/embed/chat-qualificacao?schoolId=${schoolId}`;
     
@@ -946,18 +949,26 @@ Prefere uma conversa online ou presencial na nossa escola?`;
 
   // Copiar código para clipboard
   const copyToClipboard = (text: string, type: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-      toast({
-        title: "Copiado!",
-        description: `Código ${type} copiado para área de transferência`,
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(() => {
+        toast({
+          title: "Copiado!",
+          description: `Código ${type} copiado para área de transferência`,
+        });
+      }).catch(() => {
+        toast({
+          title: "Erro",
+          description: "Não foi possível copiar o código",
+          variant: "destructive",
+        });
       });
-    }).catch(() => {
+    } else {
       toast({
         title: "Erro",
-        description: "Não foi possível copiar o código",
+        description: "Clipboard não disponível",
         variant: "destructive",
       });
-    });
+    }
   };
 
   return (
@@ -1275,7 +1286,7 @@ Prefere uma conversa online ou presencial na nossa escola?`;
                   <div className="bg-blue-900/20 rounded-lg p-4 border border-blue-500/30">
                     <h4 className="font-medium text-blue-300 mb-2">🔗 URL do Chat:</h4>
                     <code className="text-sm text-blue-400 bg-slate-900 px-2 py-1 rounded">
-                      {window.location.origin}/embed/chat-qualificacao?schoolId={user?.schoolId || '1'}
+                      {typeof window !== 'undefined' ? window.location.origin : 'https://your-domain.com'}/embed/chat-qualificacao?schoolId={user?.schoolId || '1'}
                     </code>
                   </div>
                 </div>

@@ -93,7 +93,7 @@ export const WhatsAppIntegration = () => {
     url: 'http://localhost:3000',
     apiKey: '',
     session: 'default',
-    chatgptKey: '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'
+    chatgptKey: ''
   });
   
   // Estados da conexão WhatsApp
