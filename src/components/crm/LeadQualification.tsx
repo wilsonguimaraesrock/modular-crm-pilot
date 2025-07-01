@@ -216,13 +216,20 @@ export const LeadQualification = () => {
       const savedApiKey = localStorage.getItem(`gemini_api_key_${user.schoolId}`);
       if (savedApiKey) {
         setApiKey(savedApiKey);
-        setIsConfigured(true);
+        setIsConfigured(!!savedApiKey.trim());
       } else {
-        // Configurar API key padrão da OpenAI
-        const defaultApiKey = '';
-        setApiKey(defaultApiKey);
-        localStorage.setItem(`gemini_api_key_${user.schoolId}`, defaultApiKey);
-        setIsConfigured(true);
+        // Tentar carregar de variáveis de ambiente
+        const envOpenAI = import.meta.env.VITE_OPENAI_API_KEY;
+        const envGemini = import.meta.env.VITE_GEMINI_API_KEY;
+        const defaultApiKey = envGemini || envOpenAI || '';
+        
+        if (defaultApiKey) {
+          setApiKey(defaultApiKey);
+          localStorage.setItem(`gemini_api_key_${user.schoolId}`, defaultApiKey);
+          setIsConfigured(true);
+        } else {
+          setIsConfigured(false);
+        }
       }
 
       // Carregar conversa ativa existente
