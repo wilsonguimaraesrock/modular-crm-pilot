@@ -133,7 +133,7 @@ Como você gostaria que eu te chamasse?`;
                 >
                   <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                   <p className="text-xs opacity-70 mt-1">
-                    {msg.timestamp.toLocaleTimeString()}
+                    {(msg.timestamp instanceof Date ? msg.timestamp : new Date(msg.timestamp)).toLocaleTimeString()}
                   </p>
                 </div>
               </div>

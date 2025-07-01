@@ -1327,7 +1327,7 @@ Prefere uma conversa online ou presencial na nossa escola?`;
                 <p className={`${
                   isMobile ? 'text-xs' : 'text-sm'
                 } opacity-70 mt-1`}>
-                  {msg.timestamp.toLocaleTimeString('pt-BR', { 
+                  {(msg.timestamp instanceof Date ? msg.timestamp : new Date(msg.timestamp)).toLocaleTimeString('pt-BR', { 
                     hour: '2-digit', 
                     minute: '2-digit' 
                   })}
