@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuth, Lead } from '@/contexts/AuthContext';
+import { toast } from '@/components/ui/use-toast';
 
 interface DashboardOverviewProps {
   onNavigate?: (module: string) => void;
@@ -135,6 +136,37 @@ export const DashboardOverview = ({ onNavigate }: DashboardOverviewProps) => {
       'on-demand': 'On Demand'
     };
     return labels[method as keyof typeof labels] || method;
+  };
+
+  // Função para redirecionar para WhatsApp
+  const redirectToWhatsApp = (lead: Lead) => {
+    if (!lead.phone) {
+      toast({
+        title: "Telefone não informado",
+        description: "Este lead não possui telefone cadastrado",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Salvar lead no localStorage para o WhatsApp
+    const leadData = {
+      id: lead.id,
+      name: lead.name,
+      phone: lead.phone,
+      timestamp: Date.now()
+    };
+    
+    localStorage.setItem('whatsapp_target_lead', JSON.stringify(leadData));
+    
+    // Redirecionar para WhatsApp
+    if (onNavigate) {
+      onNavigate('whatsapp');
+      toast({
+        title: "Redirecionando para WhatsApp",
+        description: `Preparando conversa com ${lead.name}`,
+      });
+    }
   };
 
   const container = {
@@ -359,6 +391,20 @@ export const DashboardOverview = ({ onNavigate }: DashboardOverviewProps) => {
                                     <div className={`flex ${
                                       isMobile ? 'flex-col space-y-1' : 'space-x-2'
                                     }`}>
+                                      {/* Botão WhatsApp */}
+                                      {lead.phone && (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => redirectToWhatsApp(lead)}
+                                          className={`text-green-400 border-green-400 hover:border-green-500 hover:text-green-500 bg-transparent ${
+                                            isMobile ? 'text-xs h-7' : 'text-xs'
+                                          }`}
+                                        >
+                                          WhatsApp
+                                        </Button>
+                                      )}
+                                      
                                       {stage.id === 'novo' && (
                                         <Button
                                           size="sm"

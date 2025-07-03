@@ -1,5 +1,120 @@
 # 📝 CHANGELOG - CRM Inteligente Rockfeller Brasil
 
+## 🎯 **Versão 1.3.0** - Sistema de Follow-ups + WhatsApp Aprimorado (Julho 2025)
+
+### 🎨 **NOVAS FUNCIONALIDADES PRINCIPAIS**
+
+#### 📝 **Sistema Completo de Follow-ups** *(MAIOR NOVIDADE!)*
+- **✨ Sistema independente** do pipeline de leads
+- **📋 6 tipos de follow-up**: Ligação, Email, WhatsApp, Visita, Reunião, Outro
+- **🚦 3 níveis de prioridade** com cores visuais: Alta (vermelho), Média (amarelo), Baixa (verde)
+- **📅 Agendamento com data/hora** para próximo contato
+- **📊 3 status distintos**: Pendente, Concluído, Cancelado
+- **🎯 CRUD completo** no AuthContext
+- **💾 Persistência independente** no localStorage
+
+#### 📱 **WhatsApp Integrado e Melhorado**
+- **🔄 Carregamento automático** de conversas quando conectado
+- **🟢 Botão direto** nos cards de leads (contorno verde)
+- **↗️ Redirecionamento automático** do dashboard para WhatsApp
+- **💬 Mensagens personalizadas** pré-configuradas por lead
+- **🐛 Logs detalhados** para debugging
+- **⚡ Fix do carregamento** - conversas aparecem automaticamente
+
+#### 🎨 **Interface Aprimorada**
+- **🔍 Modal expandido** nos cards de leads com detalhes completos
+- **🌈 Melhor contraste** nos dropdowns de follow-up (SelectItem cinza)
+- **📝 Labels explicativos** para campos de data ("Agendar próximo contato")
+- **📱 Design responsivo** otimizado para mobile
+
+### 🔧 **MELHORIAS TÉCNICAS ESPECÍFICAS**
+
+#### **Correções Críticas**
+- **🔧 Fix useEffect WhatsApp** - conversas carregam independente da aba ativa
+- **🗂️ Sistema de variáveis de ambiente** para segurança das chaves API
+- **🔐 Arquivo .env configurado** - chaves não expostas no código
+- **📊 Estado reativo** - follow-ups se atualizam em tempo real
+
+#### **Follow-ups - Detalhes Técnicos**
+```typescript
+interface FollowUp {
+  id: string;
+  leadId: string;
+  leadName: string;
+  type: 'ligacao' | 'email' | 'whatsapp' | 'visita' | 'reuniao' | 'outro';
+  priority: 'alta' | 'media' | 'baixa';
+  description: string;
+  scheduledDate: Date;
+  status: 'pendente' | 'concluido' | 'cancelado';
+  notes?: string;
+  schoolId: string;
+  assignedTo?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+#### **Funções AuthContext Implementadas**
+- ✅ `createFollowUp()` - Criar novo follow-up
+- ✅ `updateFollowUp()` - Atualizar follow-up existente  
+- ✅ `deleteFollowUp()` - Remover follow-up
+- ✅ `getFollowUpsBySchool()` - Buscar por escola
+- ✅ `getFollowUpsByLead()` - Buscar por lead específico
+
+### 📋 **FUNCIONALIDADES ESPECÍFICAS**
+
+#### **Dashboard com Botão WhatsApp**
+- ✅ **Botão "WhatsApp"** em todos os cards de leads (se tiver telefone)
+- ✅ **Estilo contorno verde** (não preenchido)
+- ✅ **Redirecionamento automático** para aba WhatsApp
+- ✅ **Mensagem personalizada** pré-populada
+- ✅ **Toast de confirmação** ao redirecionar
+
+#### **Modal de Follow-ups** 
+- ✅ **Formulário completo** com todos os campos
+- ✅ **Seleção por tipo** com ícones visuais
+- ✅ **Cores por prioridade** (alta=red, média=yellow, baixa=green)
+- ✅ **Campo de data/hora** para agendamento
+- ✅ **Lista de follow-ups** do lead selecionado
+- ✅ **Ações de editar/deletar** cada follow-up
+
+#### **WhatsApp Auto-Loading**
+- ✅ **Verifica status** a cada render do useEffect
+- ✅ **Carrega conversas** quando status = 'WORKING'
+- ✅ **Independent da aba** - não precisa estar em "conversations"
+- ✅ **Logs de debug** para monitoramento
+- ✅ **Lead direcionado** com mensagem personalizada
+
+### 🔄 **CONFIGURAÇÕES E SETUP**
+
+#### **Variáveis de Ambiente (.env)**
+```env
+# Chaves de API (não expostas no código)
+VITE_OPENAI_API_KEY=sk-...
+VITE_GEMINI_API_KEY=AIzaSy...
+VITE_WAHA_BASE_URL=http://localhost:3000
+VITE_WAHA_SESSION=default
+VITE_DEV_MODE=true
+```
+
+#### **Follow-ups - Cores e Ícones**
+```css
+/* Prioridades */
+.priority-alta { color: #ef4444; }    /* red-500 */
+.priority-media { color: #eab308; }   /* yellow-500 */
+.priority-baixa { color: #22c55e; }   /* green-500 */
+
+/* Tipos com ícones */
+ligacao: Phone
+email: Mail  
+whatsapp: MessageSquare
+visita: MapPin
+reuniao: Calendar
+outro: Clock
+```
+
+---
+
 ## 🎯 **Versão 2.1.0** - Sistema WhatsApp Renovado + Fotos de Perfil (Janeiro 2025)
 
 ### 🎨 **NOVAS FUNCIONALIDADES PRINCIPAIS**

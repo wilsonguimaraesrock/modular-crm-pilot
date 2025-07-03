@@ -102,6 +102,22 @@ export interface QualificationConversation {
   updatedAt: Date;
 }
 
+export interface FollowUp {
+  id: string;
+  leadId: string;
+  leadName: string;
+  type: 'ligacao' | 'email' | 'whatsapp' | 'visita' | 'reuniao' | 'outro';
+  priority: 'alta' | 'media' | 'baixa';
+  description: string;
+  scheduledDate: Date;
+  status: 'pendente' | 'concluido' | 'cancelado';
+  notes?: string;
+  schoolId: string;
+  assignedTo?: string; // ID do vendedor
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface AuthUser {
   id: string;
   name: string;
@@ -120,6 +136,7 @@ interface AuthContextType {
   leads: Lead[];
   appointments: Appointment[];
   qualificationConversations: QualificationConversation[];
+  followUps: FollowUp[];
   currentSchool: School | null;
   isLoading: boolean;
   
@@ -173,6 +190,13 @@ interface AuthContextType {
   updateQualificationConversation: (id: string, data: Partial<QualificationConversation>) => Promise<boolean>;
   getQualificationConversationsBySchool: (schoolId: string) => QualificationConversation[];
   getActiveQualificationConversation: (schoolId: string) => QualificationConversation | null;
+  
+  // Follow-up functions
+  createFollowUp: (data: Omit<FollowUp, 'id' | 'createdAt' | 'updatedAt'>) => Promise<boolean>;
+  updateFollowUp: (id: string, data: Partial<FollowUp>) => Promise<boolean>;
+  deleteFollowUp: (id: string) => Promise<boolean>;
+  getFollowUpsBySchool: (schoolId: string) => FollowUp[];
+  getFollowUpsByLead: (leadId: string) => FollowUp[];
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -340,6 +364,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return savedConversations ? JSON.parse(savedConversations) : [];
     } catch (error) {
       console.error('Erro ao recuperar conversas:', error);
+      return [];
+    }
+  });
+  const [followUps, setFollowUps] = useState<FollowUp[]>(() => {
+    try {
+      const savedFollowUps = localStorage.getItem('crm_follow_ups');
+      return savedFollowUps ? JSON.parse(savedFollowUps) : [];
+    } catch (error) {
+      console.error('Erro ao recuperar follow-ups:', error);
       return [];
     }
   });
@@ -798,6 +831,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return activeConversations.length > 0 ? activeConversations[activeConversations.length - 1] : null;
   };
 
+  // Follow-up functions
+  const createFollowUp = async (data: Omit<FollowUp, 'id' | 'createdAt' | 'updatedAt'>): Promise<boolean> => {
+    try {
+      const newFollowUp: FollowUp = {
+        ...data,
+        id: `followup_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      const updatedFollowUps = [...followUps, newFollowUp];
+      setFollowUps(updatedFollowUps);
+      localStorage.setItem('crm_follow_ups', JSON.stringify(updatedFollowUps));
+      return true;
+    } catch (error) {
+      console.error('Erro ao criar follow-up:', error);
+      return false;
+    }
+  };
+
+  const updateFollowUp = async (id: string, data: Partial<FollowUp>): Promise<boolean> => {
+    try {
+      const updatedFollowUps = followUps.map(f => 
+        f.id === id ? { ...f, ...data, updatedAt: new Date() } : f
+      );
+      setFollowUps(updatedFollowUps);
+      localStorage.setItem('crm_follow_ups', JSON.stringify(updatedFollowUps));
+      return true;
+    } catch (error) {
+      console.error('Erro ao atualizar follow-up:', error);
+      return false;
+    }
+  };
+
+  const deleteFollowUp = async (id: string): Promise<boolean> => {
+    try {
+      const updatedFollowUps = followUps.filter(f => f.id !== id);
+      setFollowUps(updatedFollowUps);
+      localStorage.setItem('crm_follow_ups', JSON.stringify(updatedFollowUps));
+      return true;
+    } catch (error) {
+      console.error('Erro ao deletar follow-up:', error);
+      return false;
+    }
+  };
+
+  const getFollowUpsBySchool = (schoolId: string): FollowUp[] => {
+    return followUps.filter(f => f.schoolId === schoolId);
+  };
+
+  const getFollowUpsByLead = (leadId: string): FollowUp[] => {
+    return followUps.filter(f => f.leadId === leadId);
+  };
+
   const getLeadStats = (schoolId: string) => {
     const schoolLeads = getLeadsBySchool(schoolId);
     const today = new Date();
@@ -856,6 +943,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     leads,
     appointments,
     qualificationConversations,
+    followUps,
     currentSchool,
     isLoading,
     loginAsSchool,
@@ -886,7 +974,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     createQualificationConversation,
     updateQualificationConversation,
     getQualificationConversationsBySchool,
-    getActiveQualificationConversation
+    getActiveQualificationConversation,
+    createFollowUp,
+    updateFollowUp,
+    deleteFollowUp,
+    getFollowUpsBySchool,
+    getFollowUpsByLead
   };
 
   return (

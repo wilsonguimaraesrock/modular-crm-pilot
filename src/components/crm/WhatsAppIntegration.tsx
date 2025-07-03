@@ -138,6 +138,48 @@ export const WhatsAppIntegration = () => {
   const schoolLeads = user ? getLeadsBySchool(user.schoolId) : [];
   const sellers = user ? getSellersBySchool(user.schoolId) : [];
 
+  // Verificar se há lead direcionado do dashboard
+  useEffect(() => {
+    const savedTargetLead = localStorage.getItem('whatsapp_target_lead');
+    if (savedTargetLead) {
+      try {
+        const leadData = JSON.parse(savedTargetLead);
+        // Verificar se não é muito antigo (5 minutos)
+        const isRecent = (Date.now() - leadData.timestamp) < 5 * 60 * 1000;
+        
+        if (isRecent) {
+          // Limpar o número de telefone (remover caracteres especiais)
+          const cleanPhone = leadData.phone.replace(/[^\d]/g, '');
+          setPhoneNumber(cleanPhone);
+          
+          // Mensagem personalizada
+          const personalizedMessage = `Olá ${leadData.name}! Sou da ${user?.school?.name || 'Rockfeller Brasil'}. 
+
+Vi que você tem interesse em nossos cursos de inglês. Gostaria de conversarmos sobre as opções que temos para você?
+
+Posso te ajudar a escolher o curso ideal para seu perfil! 😊`;
+          
+          setMessage(personalizedMessage);
+          
+          // Ir para a aba de envio manual automaticamente
+          setActiveTab('manual-send');
+          
+          // Mostrar notificação
+          toast({
+            title: "Lead direcionado",
+            description: `Pronto para conversar com ${leadData.name} via WhatsApp`,
+          });
+        }
+        
+        // Limpar o localStorage
+        localStorage.removeItem('whatsapp_target_lead');
+      } catch (error) {
+        console.error('Erro ao processar lead direcionado:', error);
+        localStorage.removeItem('whatsapp_target_lead');
+      }
+    }
+  }, [user, toast]);
+
   // Carregar configurações salvas
   useEffect(() => {
     if (user) {
@@ -165,10 +207,17 @@ export const WhatsAppIntegration = () => {
 
   // Carregar conversas quando a sessão estiver ativa
   useEffect(() => {
-    if (sessionStatus?.status === 'WORKING' && activeTab === 'conversations') {
+    console.log('[useEffect] Verificando condições para carregar conversas:', {
+      sessionStatus: sessionStatus?.status,
+      shouldLoadChats: sessionStatus?.status === 'WORKING'
+    });
+    
+    // Carregar conversas sempre que estiver conectado, independente da aba
+    if (sessionStatus?.status === 'WORKING') {
+      console.log('[useEffect] Carregando conversas automaticamente...');
       loadChats();
     }
-  }, [sessionStatus?.status, activeTab]);
+  }, [sessionStatus?.status]);
 
   // Auto-refresh das mensagens quando uma conversa está selecionada
   useEffect(() => {
