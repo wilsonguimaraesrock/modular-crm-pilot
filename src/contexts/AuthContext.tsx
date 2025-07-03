@@ -118,6 +118,27 @@ export interface FollowUp {
   updatedAt: Date;
 }
 
+export interface Task {
+  id: string;
+  title: string;
+  description: string;
+  type: 'follow_up' | 'manual';
+  priority: 'alta' | 'media' | 'baixa';
+  status: 'pendente' | 'concluido' | 'cancelado';
+  scheduledDate: Date;
+  completedDate?: Date;
+  schoolId: string;
+  assignedTo?: string; // ID do vendedor
+  leadId?: string; // Para tarefas relacionadas a leads
+  leadName?: string; // Para tarefas relacionadas a leads
+  category?: string; // Categoria da tarefa (ex: vendas, marketing, admin)
+  estimatedTime?: number; // Tempo estimado em minutos
+  actualTime?: number; // Tempo real gasto em minutos
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface AuthUser {
   id: string;
   name: string;
@@ -137,6 +158,7 @@ interface AuthContextType {
   appointments: Appointment[];
   qualificationConversations: QualificationConversation[];
   followUps: FollowUp[];
+  tasks: Task[];
   currentSchool: School | null;
   isLoading: boolean;
   
@@ -197,6 +219,22 @@ interface AuthContextType {
   deleteFollowUp: (id: string) => Promise<boolean>;
   getFollowUpsBySchool: (schoolId: string) => FollowUp[];
   getFollowUpsByLead: (leadId: string) => FollowUp[];
+  
+  // Task functions
+  createTask: (data: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => Promise<boolean>;
+  updateTask: (id: string, data: Partial<Task>) => Promise<boolean>;
+  deleteTask: (id: string) => Promise<boolean>;
+  getTasksBySchool: (schoolId: string) => Task[];
+  getTasksByDate: (schoolId: string, date: Date) => Task[];
+  getTasksByDateRange: (schoolId: string, startDate: Date, endDate: Date) => Task[];
+  getTaskStats: (schoolId: string) => {
+    total: number;
+    pendentes: number;
+    concluidas: number;
+    atrasadas: number;
+    performance: number;
+  };
+  getAllTasksForAgenda: (schoolId: string) => Task[];
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -373,6 +411,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return savedFollowUps ? JSON.parse(savedFollowUps) : [];
     } catch (error) {
       console.error('Erro ao recuperar follow-ups:', error);
+      return [];
+    }
+  });
+  const [tasks, setTasks] = useState<Task[]>(() => {
+    try {
+      const savedTasks = localStorage.getItem('crm_tasks');
+      return savedTasks ? JSON.parse(savedTasks) : [];
+    } catch (error) {
+      console.error('Erro ao recuperar tarefas:', error);
       return [];
     }
   });
@@ -885,6 +932,134 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return followUps.filter(f => f.leadId === leadId);
   };
 
+  // Task functions
+  const createTask = async (data: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>): Promise<boolean> => {
+    try {
+      const newTask: Task = {
+        ...data,
+        id: Date.now().toString(),
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      const updatedTasks = [...tasks, newTask];
+      setTasks(updatedTasks);
+      localStorage.setItem('crm_tasks', JSON.stringify(updatedTasks));
+      return true;
+    } catch (error) {
+      console.error('Erro ao criar tarefa:', error);
+      return false;
+    }
+  };
+
+  const updateTask = async (id: string, data: Partial<Task>): Promise<boolean> => {
+    try {
+      const updatedTasks = tasks.map(task => {
+        if (task.id === id) {
+          return { ...task, ...data, updatedAt: new Date() };
+        }
+        return task;
+      });
+      setTasks(updatedTasks);
+      localStorage.setItem('crm_tasks', JSON.stringify(updatedTasks));
+      return true;
+    } catch (error) {
+      console.error('Erro ao atualizar tarefa:', error);
+      return false;
+    }
+  };
+
+  const deleteTask = async (id: string): Promise<boolean> => {
+    try {
+      const updatedTasks = tasks.filter(task => task.id !== id);
+      setTasks(updatedTasks);
+      localStorage.setItem('crm_tasks', JSON.stringify(updatedTasks));
+      return true;
+    } catch (error) {
+      console.error('Erro ao deletar tarefa:', error);
+      return false;
+    }
+  };
+
+  const getTasksBySchool = (schoolId: string): Task[] => {
+    return tasks.filter(task => task.schoolId === schoolId);
+  };
+
+  const getTasksByDate = (schoolId: string, date: Date): Task[] => {
+    const dateStr = date.toISOString().split('T')[0];
+    return tasks.filter(task => 
+      task.schoolId === schoolId && 
+      task.scheduledDate.toISOString().split('T')[0] === dateStr
+    );
+  };
+
+  const getTasksByDateRange = (schoolId: string, startDate: Date, endDate: Date): Task[] => {
+    return tasks.filter(task => 
+      task.schoolId === schoolId && 
+      task.scheduledDate >= startDate && 
+      task.scheduledDate <= endDate
+    );
+  };
+
+  const getTaskStats = (schoolId: string) => {
+    const schoolTasks = getTasksBySchool(schoolId);
+    const now = new Date();
+    
+    const total = schoolTasks.length;
+    const pendentes = schoolTasks.filter(task => task.status === 'pendente').length;
+    const concluidas = schoolTasks.filter(task => task.status === 'concluido').length;
+    const atrasadas = schoolTasks.filter(task => 
+      task.status === 'pendente' && task.scheduledDate < now
+    ).length;
+    
+    // Cálculo de performance baseado em tarefas concluídas no prazo
+    const tarefasConcluidas = schoolTasks.filter(task => 
+      task.status === 'concluido' && task.completedDate
+    );
+    const tarefasNoPrazo = tarefasConcluidas.filter(task => 
+      task.completedDate && task.completedDate <= task.scheduledDate
+    ).length;
+    
+    const performance = tarefasConcluidas.length > 0 
+      ? Math.round((tarefasNoPrazo / tarefasConcluidas.length) * 100)
+      : 0;
+    
+    return {
+      total,
+      pendentes,
+      concluidas,
+      atrasadas,
+      performance
+    };
+  };
+
+  const getAllTasksForAgenda = (schoolId: string): Task[] => {
+    // Combinar tarefas manuais com follow-ups convertidos em tarefas
+    const manualTasks = getTasksBySchool(schoolId);
+    const followUpTasks: Task[] = getFollowUpsBySchool(schoolId).map(followUp => ({
+      id: `followup_${followUp.id}`,
+      title: `Follow-up: ${followUp.description}`,
+      description: followUp.description,
+      type: 'follow_up' as const,
+      priority: followUp.priority,
+      status: followUp.status,
+      scheduledDate: followUp.scheduledDate,
+      completedDate: followUp.status === 'concluido' ? followUp.updatedAt : undefined,
+      schoolId: followUp.schoolId,
+      assignedTo: followUp.assignedTo,
+      leadId: followUp.leadId,
+      leadName: followUp.leadName,
+      category: followUp.type,
+      notes: followUp.notes,
+      createdAt: followUp.createdAt,
+      updatedAt: followUp.updatedAt
+    }));
+    
+    return [...manualTasks, ...followUpTasks].sort((a, b) => 
+      a.scheduledDate.getTime() - b.scheduledDate.getTime()
+    );
+  };
+
   const getLeadStats = (schoolId: string) => {
     const schoolLeads = getLeadsBySchool(schoolId);
     const today = new Date();
@@ -944,6 +1119,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     appointments,
     qualificationConversations,
     followUps,
+    tasks,
     currentSchool,
     isLoading,
     loginAsSchool,
@@ -979,7 +1155,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     updateFollowUp,
     deleteFollowUp,
     getFollowUpsBySchool,
-    getFollowUpsByLead
+    getFollowUpsByLead,
+    createTask,
+    updateTask,
+    deleteTask,
+    getTasksBySchool,
+    getTasksByDate,
+    getTasksByDateRange,
+    getTaskStats,
+    getAllTasksForAgenda
   };
 
   return (

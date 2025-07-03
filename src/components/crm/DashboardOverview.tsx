@@ -2,11 +2,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
-import { Users, MessageSquare, Calendar, Send, TrendingUp, Plus, Phone, Mail, Clock, User, ArrowLeft } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Users, MessageSquare, Calendar, Send, TrendingUp, Plus, Phone, Mail, Clock, User, ArrowLeft, FileText, AlertCircle, CheckCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { useAuth, Lead } from '@/contexts/AuthContext';
+import { useAuth, Lead, FollowUp } from '@/contexts/AuthContext';
 import { toast } from '@/components/ui/use-toast';
 
 interface DashboardOverviewProps {
@@ -15,7 +20,20 @@ interface DashboardOverviewProps {
 
 export const DashboardOverview = ({ onNavigate }: DashboardOverviewProps) => {
   const isMobile = useIsMobile();
-  const { user, getLeadStats, getLeadsBySchool, updateLead } = useAuth();
+  const { user, getLeadStats, getLeadsBySchool, updateLead, getFollowUpsByLead, createFollowUp, getSellersBySchool } = useAuth();
+  
+  // Estados para o modal de detalhes do lead
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
+  const [followUps, setFollowUps] = useState<FollowUp[]>([]);
+  const [newFollowUp, setNewFollowUp] = useState({
+    type: 'ligacao' as const,
+    priority: 'media' as const,
+    description: '',
+    scheduledDate: '',
+    assignedTo: '',
+    notes: ''
+  });
   
   // Obter estatísticas reais do contexto
   const stats = user ? getLeadStats(user.schoolId) : {
@@ -27,6 +45,70 @@ export const DashboardOverview = ({ onNavigate }: DashboardOverviewProps) => {
   };
 
   const schoolLeads = user ? getLeadsBySchool(user.schoolId) : [];
+  const sellers = user ? getSellersBySchool(user.schoolId) : [];
+
+  // Função para abrir modal de detalhes do lead
+  const openLeadModal = (lead: Lead) => {
+    setSelectedLead(lead);
+    setFollowUps(getFollowUpsByLead(lead.id));
+    setIsLeadModalOpen(true);
+  };
+
+  // Função para criar novo follow-up
+  const handleCreateFollowUp = async () => {
+    if (!selectedLead || !newFollowUp.description || !newFollowUp.scheduledDate || !user) {
+      toast({
+        title: "Erro",
+        description: "Preencha todos os campos obrigatórios",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Criar o objeto follow-up que será salvo
+    const followUpData = {
+      leadId: selectedLead.id,
+      leadName: selectedLead.name,
+      type: newFollowUp.type,
+      priority: newFollowUp.priority,
+      description: newFollowUp.description,
+      scheduledDate: new Date(newFollowUp.scheduledDate),
+      status: 'pendente' as const,
+      schoolId: user.schoolId,
+      assignedTo: newFollowUp.assignedTo || user.id,
+      notes: newFollowUp.notes
+    };
+
+    const success = await createFollowUp(followUpData);
+
+    if (success) {
+      toast({
+        title: "Follow-up criado!",
+        description: "Follow-up foi agendado com sucesso",
+      });
+      
+      // Criar o follow-up completo para adicionar ao estado local
+      const newFollowUpComplete = {
+        id: Date.now().toString(), // ID temporário
+        ...followUpData,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      
+      // Adicionar o novo follow-up à lista existente imediatamente
+      setFollowUps(prev => [...prev, newFollowUpComplete]);
+      
+      // Resetar formulário
+      setNewFollowUp({
+        type: 'ligacao',
+        priority: 'media',
+        description: '',
+        scheduledDate: '',
+        assignedTo: '',
+        notes: ''
+      });
+    }
+  };
 
   const statsDisplay = [
     { label: 'Leads Capturados', value: stats.leadsHoje, icon: Users, color: 'from-blue-500 to-blue-600' },
@@ -297,7 +379,10 @@ export const DashboardOverview = ({ onNavigate }: DashboardOverviewProps) => {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: leadIndex * 0.1 }}
                           >
-                            <Card className="bg-slate-700/50 border-slate-600 hover:bg-slate-700/70 transition-all duration-200 cursor-pointer group">
+                            <Card 
+                              className="bg-slate-700/50 border-slate-600 hover:bg-slate-700/70 transition-all duration-200 cursor-pointer group"
+                              onClick={() => openLeadModal(lead)}
+                            >
                               <CardContent className={`${isMobile ? 'p-3' : 'p-4'}`}>
                                 <div className="space-y-2">
                                   {/* Nome e método */}
@@ -378,7 +463,10 @@ export const DashboardOverview = ({ onNavigate }: DashboardOverviewProps) => {
                                       <Button
                                         size="sm"
                                         variant="ghost"
-                                        onClick={() => moveLeadToPreviousStage(lead.id, lead.status)}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          moveLeadToPreviousStage(lead.id, lead.status);
+                                        }}
                                         className="p-1 h-6 w-6 text-slate-400 hover:text-white hover:bg-slate-600"
                                       >
                                         <ArrowLeft size={14} />
@@ -396,7 +484,10 @@ export const DashboardOverview = ({ onNavigate }: DashboardOverviewProps) => {
                                         <Button
                                           size="sm"
                                           variant="outline"
-                                          onClick={() => redirectToWhatsApp(lead)}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            redirectToWhatsApp(lead);
+                                          }}
                                           className={`text-green-400 border-green-400 hover:border-green-500 hover:text-green-500 bg-transparent ${
                                             isMobile ? 'text-xs h-7' : 'text-xs'
                                           }`}
@@ -408,7 +499,10 @@ export const DashboardOverview = ({ onNavigate }: DashboardOverviewProps) => {
                                       {stage.id === 'novo' && (
                                         <Button
                                           size="sm"
-                                          onClick={() => moveLeadToStage(lead.id, 'qualificado')}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            moveLeadToStage(lead.id, 'qualificado');
+                                          }}
                                           className={`bg-green-600 hover:bg-green-700 text-white ${
                                             isMobile ? 'text-xs h-7' : 'text-xs'
                                           }`}
@@ -419,7 +513,10 @@ export const DashboardOverview = ({ onNavigate }: DashboardOverviewProps) => {
                                       {stage.id === 'qualificado' && (
                                         <Button
                                           size="sm"
-                                          onClick={() => moveLeadToStage(lead.id, 'agendado')}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            moveLeadToStage(lead.id, 'agendado');
+                                          }}
                                           className={`bg-yellow-600 hover:bg-yellow-700 text-white ${
                                             isMobile ? 'text-xs h-7' : 'text-xs'
                                           }`}
@@ -430,7 +527,10 @@ export const DashboardOverview = ({ onNavigate }: DashboardOverviewProps) => {
                                       {stage.id === 'agendado' && (
                                         <Button
                                           size="sm"
-                                          onClick={() => moveLeadToStage(lead.id, 'fechado')}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            moveLeadToStage(lead.id, 'fechado');
+                                          }}
                                           className={`bg-purple-600 hover:bg-purple-700 text-white ${
                                             isMobile ? 'text-xs h-7' : 'text-xs'
                                           }`}
@@ -498,6 +598,149 @@ export const DashboardOverview = ({ onNavigate }: DashboardOverviewProps) => {
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* Modal de Follow-ups - Layout Simplificado */}
+      <Dialog open={isLeadModalOpen} onOpenChange={setIsLeadModalOpen}>
+        <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <FileText className="w-5 h-5" />
+              <span>Follow-ups - {selectedLead?.name}</span>
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedLead && (
+            <div className="space-y-4">
+              {/* Informações resumidas do Lead */}
+              <div className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                    <span className="text-white font-semibold">{selectedLead.name[0]}</span>
+                  </div>
+                  <div>
+                    <p className="text-white font-medium">{selectedLead.name}</p>
+                    <p className="text-slate-400 text-sm">{selectedLead.email}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <Badge className={getMethodColor(selectedLead.method)}>
+                    {getMethodLabel(selectedLead.method)}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Follow-ups Existentes */}
+              <div>
+                <h3 className="text-sm font-medium text-slate-300 mb-3">Follow-ups Existentes ({followUps.length})</h3>
+                {followUps.length === 0 ? (
+                  <div className="text-center py-6 text-slate-400">
+                    <AlertCircle className="w-8 h-8 mx-auto mb-2" />
+                    <p>Nenhum follow-up cadastrado</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                    {followUps.map((followUp) => (
+                      <div key={followUp.id} className="flex items-center justify-between p-2 bg-slate-700/20 rounded">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2 mb-1">
+                            <Badge className={`text-xs ${
+                              followUp.priority === 'alta' ? 'bg-red-500/20 text-red-400' :
+                              followUp.priority === 'media' ? 'bg-yellow-500/20 text-yellow-400' :
+                              'bg-green-500/20 text-green-400'
+                            }`}>
+                              {followUp.type}
+                            </Badge>
+                            <Badge className={`text-xs ${
+                              followUp.status === 'concluido' ? 'bg-green-500/20 text-green-400' :
+                              followUp.status === 'pendente' ? 'bg-blue-500/20 text-blue-400' :
+                              'bg-red-500/20 text-red-400'
+                            }`}>
+                              {followUp.status}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-white">{followUp.description}</p>
+                          <p className="text-xs text-slate-400">
+                            {new Date(followUp.scheduledDate).toLocaleDateString('pt-BR')} às {new Date(followUp.scheduledDate).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Criar Novo Follow-up - Formulário Compacto */}
+              <div className="border-t border-slate-600 pt-4">
+                <h3 className="text-sm font-medium text-slate-300 mb-3">Novo Follow-up</h3>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor="type" className="text-xs text-slate-400">Tipo</Label>
+                      <Select value={newFollowUp.type} onValueChange={(value) => setNewFollowUp({...newFollowUp, type: value as any})}>
+                        <SelectTrigger className="bg-slate-600/50 border-slate-500 h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-700 border-slate-600">
+                          <SelectItem value="ligacao">Ligação</SelectItem>
+                          <SelectItem value="email">Email</SelectItem>
+                          <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                          <SelectItem value="visita">Visita</SelectItem>
+                          <SelectItem value="reuniao">Reunião</SelectItem>
+                          <SelectItem value="outro">Outro</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="priority" className="text-xs text-slate-400">Prioridade</Label>
+                      <Select value={newFollowUp.priority} onValueChange={(value) => setNewFollowUp({...newFollowUp, priority: value as any})}>
+                        <SelectTrigger className="bg-slate-600/50 border-slate-500 h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-700 border-slate-600">
+                          <SelectItem value="alta">Alta</SelectItem>
+                          <SelectItem value="media">Média</SelectItem>
+                          <SelectItem value="baixa">Baixa</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="description" className="text-xs text-slate-400">Descrição</Label>
+                    <Textarea
+                      id="description"
+                      value={newFollowUp.description}
+                      onChange={(e) => setNewFollowUp({...newFollowUp, description: e.target.value})}
+                      placeholder="Descreva o que será feito..."
+                      className="bg-slate-600/50 border-slate-500 h-16 text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="scheduledDate" className="text-xs text-slate-400">Data e Hora</Label>
+                    <Input
+                      id="scheduledDate"
+                      type="datetime-local"
+                      value={newFollowUp.scheduledDate}
+                      onChange={(e) => setNewFollowUp({...newFollowUp, scheduledDate: e.target.value})}
+                      className="bg-slate-600/50 border-slate-500 h-8"
+                    />
+                  </div>
+
+                  <Button 
+                    onClick={handleCreateFollowUp}
+                    className="w-full bg-blue-600 hover:bg-blue-700 h-8"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Criar Follow-up
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 };

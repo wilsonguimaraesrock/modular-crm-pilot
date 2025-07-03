@@ -7,7 +7,8 @@ import {
   BarChart3,
   LogOut,
   Building,
-  User
+  User,
+  CalendarDays
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -30,6 +31,7 @@ export const Navigation = ({ activeModule, setActiveModule, isMobile = false }: 
     { id: 'leads', name: 'Captura de Leads', icon: Users, notifications: 0, allowedTypes: ['school', 'seller'] },
     { id: 'qualification', name: 'Qualificação IA', icon: MessageSquare, notifications: 0, allowedTypes: ['school', 'seller'] },
     { id: 'calendar', name: 'Agendamento', icon: Calendar, notifications: 0, allowedTypes: ['school', 'seller'] },
+    { id: 'agenda', name: 'Agenda de Tarefas', icon: CalendarDays, notifications: 0, allowedTypes: ['school', 'seller'] },
     { id: 'whatsapp', name: 'WhatsApp', icon: Send, notifications: 0, allowedTypes: ['school'] },
     { id: 'admin', name: 'Configurações', icon: Settings, notifications: 0, allowedTypes: ['school'] },
   ];
