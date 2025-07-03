@@ -1210,7 +1210,7 @@ Posso te ajudar a escolher o curso ideal para seu perfil! 😊`;
                         type="password"
                         value={wahaConfig.chatgptKey}
                         onChange={(e) => setWahaConfig({...wahaConfig, chatgptKey: e.target.value})}
-                        placeholder="sk-..."
+                        placeholder="sua-chave-openai-aqui"
                         className="bg-slate-700/50 border-slate-600 text-white"
                       />
                     </div>

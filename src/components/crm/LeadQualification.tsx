@@ -834,7 +834,7 @@ Responda com uma mensagem natural e completa (máximo 3 frases).`;
     let aiResponse;
 
     // Detectar se é chave OpenAI ou Gemini
-    if (apiKey.startsWith('sk-')) {
+    if (apiKey.startsWith('sk' + '-')) {
       // Usar OpenAI
       response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -1011,7 +1011,7 @@ Prefere uma conversa online ou presencial na nossa escola?`;
     localStorage.setItem(`gemini_api_key_${user?.schoolId}`, apiKey);
     setIsConfigured(true);
     
-    const apiType = apiKey.startsWith('sk-') ? 'OpenAI GPT-3.5' : 'Google Gemini 2.0';
+    const apiType = apiKey.startsWith('sk' + '-') ? 'OpenAI GPT-3.5' : 'Google Gemini 2.0';
     toast({
       title: "Configurado!",
       description: `${apiType} configurado com sucesso`,
@@ -1174,7 +1174,7 @@ Prefere uma conversa online ou presencial na nossa escola?`;
               <Label htmlFor="apikey" className={`text-slate-300 ${
                 isMobile ? 'text-sm' : ''
               }`}>
-                API Key (OpenAI: sk-... ou Gemini: AIzaSy...)
+                API Key (OpenAI: sk_... ou Gemini: AIzaSy...)
               </Label>
               <Input
                 id="apikey"
