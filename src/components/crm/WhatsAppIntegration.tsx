@@ -42,7 +42,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { useAuth } from '@/contexts/AuthContext';
+import { useDatabaseAuth } from '@/contexts/DatabaseAuthContext';
 import { motion } from 'framer-motion';
 
 // Interfaces
@@ -81,7 +81,7 @@ interface AIConversation {
 
 export const WhatsAppIntegration = () => {
   const isMobile = useIsMobile();
-  const { user, getLeadsBySchool, getSellersBySchool } = useAuth();
+  const { user, getLeadsBySchool, getSellersBySchool } = useDatabaseAuth();
   const { toast } = useToast();
   const qrIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const statusIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -1179,7 +1179,7 @@ Posso te ajudar a escolher o curso ideal para seu perfil! 😊`;
                         value={wahaConfig.url}
                         onChange={(e) => setWahaConfig({...wahaConfig, url: e.target.value})}
                         placeholder="http://localhost:3000"
-                        className="bg-slate-700/50 border-slate-600 text-white"
+                        className="bg-slate-800/50 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20"
                       />
                     </div>
                     
@@ -1189,7 +1189,7 @@ Posso te ajudar a escolher o curso ideal para seu perfil! 😊`;
                         value={wahaConfig.session}
                         onChange={(e) => setWahaConfig({...wahaConfig, session: e.target.value})}
                         placeholder="default"
-                        className="bg-slate-700/50 border-slate-600 text-white"
+                        className="bg-slate-800/50 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20"
                       />
                     </div>
                     
@@ -1200,7 +1200,7 @@ Posso te ajudar a escolher o curso ideal para seu perfil! 😊`;
                         value={wahaConfig.apiKey}
                         onChange={(e) => setWahaConfig({...wahaConfig, apiKey: e.target.value})}
                         placeholder="Deixe vazio se não usar"
-                        className="bg-slate-700/50 border-slate-600 text-white"
+                        className="bg-slate-800/50 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20"
                       />
                     </div>
 
@@ -1211,7 +1211,7 @@ Posso te ajudar a escolher o curso ideal para seu perfil! 😊`;
                         value={wahaConfig.chatgptKey}
                         onChange={(e) => setWahaConfig({...wahaConfig, chatgptKey: e.target.value})}
                         placeholder="sua-chave-openai-aqui"
-                        className="bg-slate-700/50 border-slate-600 text-white"
+                        className="bg-slate-800/50 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20"
                       />
                     </div>
                     
@@ -1757,7 +1757,7 @@ Posso te ajudar a escolher o curso ideal para seu perfil! 😊`;
                         value={phoneNumber}
                         onChange={(e) => setPhoneNumber(e.target.value)}
                         placeholder="+55 11 99999-9999"
-                        className="bg-slate-700/50 border-slate-600 text-white"
+                        className="bg-slate-800/50 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20"
                       />
                       <p className="text-xs text-slate-400 mt-1">
                         Use o formato: +55 11 99999-9999 ou apenas 11999999999
@@ -1770,7 +1770,7 @@ Posso te ajudar a escolher o curso ideal para seu perfil! 😊`;
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
                         rows={6}
-                        className="bg-slate-700/50 border-slate-600 text-white"
+                        className="bg-slate-800/50 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20"
                         placeholder="Digite sua mensagem..."
                       />
                     </div>

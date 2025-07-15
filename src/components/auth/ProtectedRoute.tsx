@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useDatabaseAuth } from '@/contexts/DatabaseAuthContext';
 import { LoginPage } from './LoginPage';
 
 interface ProtectedRouteProps {
@@ -13,7 +13,7 @@ export const ProtectedRoute = ({
   requireAuth = true,
   allowedTypes = ['school', 'seller']
 }: ProtectedRouteProps) => {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading } = useDatabaseAuth();
 
   // Show loading while checking authentication
   if (isLoading) {

@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -14,71 +8,67 @@ datasource db {
 }
 
 model School {
-  id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
-  phone     String?
-  address   String?
-  createdAt DateTime @default(now())
-
-  // Relacionamentos
-  sellers                      Seller[]
-  leadSources                  LeadSource[]
-  leads                        Lead[]
-  appointments                 Appointment[]
-  qualificationConversations   QualificationConversation[]
-  followUps                    FollowUp[]
-  tasks                        Task[]
+  id                         String                      @id @default(cuid())
+  name                       String
+  email                      String                      @unique
+  phone                      String?
+  address                    String?
+  createdAt                  DateTime                    @default(now())
+  appointments               Appointment[]
+  followUps                  FollowUp[]
+  leadSources                LeadSource[]
+  leads                      Lead[]
+  qualificationConversations QualificationConversation[]
+  sellers                    Seller[]
+  tasks                      Task[]
 
   @@map("schools")
 }
 
 model Seller {
-  id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
-  phone     String
-  role      String
-  schoolId  String
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
+  id                         String                      @id @default(cuid())
+  name                       String
+  email                      String                      @unique
+  phone                      String
+  role                       String
+  schoolId                   String
+  active                     Boolean                     @default(true)
+  createdAt                  DateTime                    @default(now())
+  appointments               Appointment[]
+  followUps                  FollowUp[]
+  leads                      Lead[]
+  qualificationConversations QualificationConversation[]
+  school                     School                      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  tasks                      Task[]
 
-  // Relacionamentos
-  school                       School                      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  leads                        Lead[]
-  appointments                 Appointment[]
-  qualificationConversations   QualificationConversation[]
-  followUps                    FollowUp[]
-  tasks                        Task[]
-
+  @@index([schoolId], map: "sellers_schoolId_fkey")
   @@map("sellers")
 }
 
 model LeadSource {
-  id           String   @id @default(cuid())
-  name         String
-  type         String   // 'form' | 'integration'
-  icon         String
-  active       Boolean  @default(false)
-  url          String?
-  description  String
-  fields       Json     // Array de strings
-  autoAssign   String?
-  notifications Boolean @default(true)
-  webhookUrl   String?
-  leadsCount   Int      @default(0)
-  schoolId     String
-  createdAt    DateTime @default(now())
+  id            String   @id @default(cuid())
+  name          String
+  type          String
+  icon          String
+  active        Boolean  @default(false)
+  url           String?
+  description   String
+  fields        Json
+  autoAssign    String?
+  notifications Boolean  @default(true)
+  webhookUrl    String?
+  leadsCount    Int      @default(0)
+  schoolId      String
+  createdAt     DateTime @default(now())
+  school        School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  leads         Lead[]
 
-  // Relacionamentos
-  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  leads  Lead[]
-
+  @@index([schoolId], map: "lead_sources_schoolId_fkey")
   @@map("lead_sources")
 }
 
 model Lead {
-  id           String    @id @default(cuid())
+  id           String        @id @default(cuid())
   name         String
   email        String
   phone        String
@@ -86,30 +76,31 @@ model Lead {
   position     String?
   interests    String?
   source       String
-  method       String    // Adults, Teens, Kids, Practice & Progress, On Demand
-  modality     String    // Presencial ou Live
+  method       String
+  modality     String
   age          String?
   experience   String?
   availability String?
   budget       String?
   goals        String?
-  score        Int       @default(0)
-  status       String    @default("novo") // 'novo' | 'qualificado' | 'agendado' | 'fechado' | 'perdido'
+  score        Int           @default(0)
+  status       String        @default("novo")
   schoolId     String
   assignedTo   String?
   sourceId     String?
-  notes        String?   @db.Text
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  // Relacionamentos
-  school       School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  seller       Seller?       @relation(fields: [assignedTo], references: [id])
-  leadSource   LeadSource?   @relation(fields: [sourceId], references: [id])
+  notes        String?       @db.Text
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
   appointments Appointment[]
   followUps    FollowUp[]
+  seller       Seller?       @relation(fields: [assignedTo], references: [id])
+  school       School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  leadSource   LeadSource?   @relation(fields: [sourceId], references: [id])
   tasks        Task[]
 
+  @@index([assignedTo], map: "leads_assignedTo_fkey")
+  @@index([schoolId], map: "leads_schoolId_fkey")
+  @@index([sourceId], map: "leads_sourceId_fkey")
   @@map("leads")
 }
 
@@ -121,8 +112,8 @@ model Appointment {
   leadEmail   String?
   date        String
   time        String
-  type        String   // 'presencial' | 'online'
-  status      String   @default("agendado") // 'agendado' | 'confirmado' | 'realizado' | 'cancelado' | 'remarcado' | 'compareceu' | 'nao_compareceu' | 'em_fechamento' | 'matriculou' | 'nao_matriculou'
+  type        String
+  status      String   @default("agendado")
   schoolId    String
   assignedTo  String?
   notes       String?  @db.Text
@@ -130,34 +121,35 @@ model Appointment {
   address     String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  seller      Seller?  @relation(fields: [assignedTo], references: [id])
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  school      School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
-  // Relacionamentos
-  school School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  lead   Lead    @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  seller Seller? @relation(fields: [assignedTo], references: [id])
-
+  @@index([assignedTo], map: "appointments_assignedTo_fkey")
+  @@index([leadId], map: "appointments_leadId_fkey")
+  @@index([schoolId], map: "appointments_schoolId_fkey")
   @@map("appointments")
 }
 
 model QualificationConversation {
-  id              String   @id @default(cuid())
-  leadName        String
-  leadPhone       String?
-  leadEmail       String?
-  messages        Json     // Array de objetos {type, content, timestamp}
-  stage           Int      @default(0)
-  score           Int      @default(0)
-  stageScores     Json     // Record<string, number>
-  schoolId        String
-  assignedSeller  String?
-  status          String   @default("active") // 'active' | 'completed' | 'abandoned'
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String   @id @default(cuid())
+  leadName       String
+  leadPhone      String?
+  leadEmail      String?
+  messages       Json
+  stage          Int      @default(0)
+  score          Int      @default(0)
+  stageScores    Json
+  schoolId       String
+  assignedSeller String?
+  status         String   @default("active")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  seller         Seller?  @relation(fields: [assignedSeller], references: [id])
+  school         School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
-  // Relacionamentos
-  school School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  seller Seller? @relation(fields: [assignedSeller], references: [id])
-
+  @@index([assignedSeller], map: "qualification_conversations_assignedSeller_fkey")
+  @@index([schoolId], map: "qualification_conversations_schoolId_fkey")
   @@map("qualification_conversations")
 }
 
@@ -165,49 +157,51 @@ model FollowUp {
   id            String   @id @default(cuid())
   leadId        String
   leadName      String
-  type          String   // 'ligacao' | 'email' | 'whatsapp' | 'visita' | 'reuniao' | 'outro'
-  priority      String   // 'alta' | 'media' | 'baixa'
+  type          String
+  priority      String
   description   String
   scheduledDate DateTime
-  status        String   @default("pendente") // 'pendente' | 'concluido' | 'cancelado'
+  status        String   @default("pendente")
   notes         String?  @db.Text
   schoolId      String
   assignedTo    String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  seller        Seller?  @relation(fields: [assignedTo], references: [id])
+  lead          Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  school        School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
-  // Relacionamentos
-  school School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  lead   Lead    @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  seller Seller? @relation(fields: [assignedTo], references: [id])
-
+  @@index([assignedTo], map: "follow_ups_assignedTo_fkey")
+  @@index([leadId], map: "follow_ups_leadId_fkey")
+  @@index([schoolId], map: "follow_ups_schoolId_fkey")
   @@map("follow_ups")
 }
 
 model Task {
-  id             String    @id @default(cuid())
-  title          String
-  description    String
-  type           String    // 'follow_up' | 'manual'
-  priority       String    // 'alta' | 'media' | 'baixa'
-  status         String    @default("pendente") // 'pendente' | 'concluido' | 'cancelado'
-  scheduledDate  DateTime
-  completedDate  DateTime?
-  schoolId       String
-  assignedTo     String?
-  leadId         String?
-  leadName       String?
-  category       String?
-  estimatedTime  Int?      // em minutos
-  actualTime     Int?      // em minutos
-  notes          String?   @db.Text
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id            String    @id @default(cuid())
+  title         String
+  description   String
+  type          String
+  priority      String
+  status        String    @default("pendente")
+  scheduledDate DateTime
+  completedDate DateTime?
+  schoolId      String
+  assignedTo    String?
+  leadId        String?
+  leadName      String?
+  category      String?
+  estimatedTime Int?
+  actualTime    Int?
+  notes         String?   @db.Text
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  seller        Seller?   @relation(fields: [assignedTo], references: [id])
+  lead          Lead?     @relation(fields: [leadId], references: [id])
+  school        School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
-  // Relacionamentos
-  school School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  seller Seller? @relation(fields: [assignedTo], references: [id])
-  lead   Lead?   @relation(fields: [leadId], references: [id])
-
+  @@index([assignedTo], map: "tasks_assignedTo_fkey")
+  @@index([leadId], map: "tasks_leadId_fkey")
+  @@index([schoolId], map: "tasks_schoolId_fkey")
   @@map("tasks")
 }

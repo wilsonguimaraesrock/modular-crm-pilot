@@ -184,6 +184,7 @@ interface AuthContextType {
   deleteLeadSource: (id: string) => Promise<boolean>;
   getLeadSourcesBySchool: (schoolId: string) => LeadSource[];
   toggleLeadSource: (id: string) => Promise<boolean>;
+  recreateDefaultLeadSources: (schoolId: string) => void;
   
   // Lead functions
   registerLead: (data: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>) => Promise<boolean>;
@@ -318,7 +319,7 @@ const DEFAULT_LEAD_SOURCES = [
     name: 'Website',
     type: 'form' as const,
     icon: 'Globe',
-    active: false,
+    active: true, // Mudança: ativa por padrão
     url: '',
     description: 'Formulário de contato do website principal',
     fields: ['name', 'email', 'phone', 'message'],
@@ -331,7 +332,7 @@ const DEFAULT_LEAD_SOURCES = [
     name: 'Facebook Ads',
     type: 'integration' as const,
     icon: 'Facebook',
-    active: false,
+    active: true, // Mudança: ativa por padrão
     url: '',
     description: 'Integração com Facebook Lead Ads',
     fields: ['name', 'email', 'phone'],
@@ -344,7 +345,7 @@ const DEFAULT_LEAD_SOURCES = [
     name: 'Instagram',
     type: 'integration' as const,
     icon: 'Instagram',
-    active: false,
+    active: true, // Mudança: ativa por padrão
     url: '',
     description: 'Integração com Instagram Business',
     fields: ['name', 'email'],
@@ -357,7 +358,7 @@ const DEFAULT_LEAD_SOURCES = [
     name: 'LinkedIn',
     type: 'integration' as const,
     icon: 'Linkedin',
-    active: false,
+    active: true, // Mudança: ativa por padrão
     url: '',
     description: 'Integração com LinkedIn Lead Gen Forms',
     fields: ['name', 'email', 'company', 'position'],
@@ -432,7 +433,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [leadSources, setLeadSources] = useState<LeadSource[]>(() => {
     try {
       const savedLeadSources = localStorage.getItem('crm_lead_sources');
-      return savedLeadSources ? JSON.parse(savedLeadSources) : MOCK_LEAD_SOURCES;
+      const sources = savedLeadSources ? JSON.parse(savedLeadSources) : MOCK_LEAD_SOURCES;
+      
+      console.log('🔍 Debug - Inicialização das fontes de leads:', {
+        hasSavedSources: !!savedLeadSources,
+        totalSources: sources.length,
+        sources: sources.map(s => ({ id: s.id, name: s.name, schoolId: s.schoolId, active: s.active }))
+      });
+      
+      return sources;
     } catch (error) {
       console.error('Erro ao recuperar fontes de leads:', error);
       return MOCK_LEAD_SOURCES;
@@ -730,9 +739,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         createdAt: new Date()
       };
 
+      console.log('🔍 Debug - Criando nova fonte de lead:', {
+        originalData: data,
+        newLeadSource: newLeadSource,
+        currentLeadSourcesCount: leadSources.length
+      });
+
       const updatedLeadSources = [...leadSources, newLeadSource];
       setLeadSources(updatedLeadSources);
       localStorage.setItem('crm_lead_sources', JSON.stringify(updatedLeadSources));
+      
+      console.log('🔍 Debug - Fonte criada com sucesso:', {
+        newSourceId: newLeadSource.id,
+        totalSourcesAfter: updatedLeadSources.length,
+        active: newLeadSource.active,
+        schoolId: newLeadSource.schoolId
+      });
+      
+      // Verificar se a fonte foi salva corretamente
+      const savedSources = JSON.parse(localStorage.getItem('crm_lead_sources') || '[]');
+      console.log('🔍 Debug - Verificação após salvar:', {
+        savedSourcesCount: savedSources.length,
+        lastSource: savedSources[savedSources.length - 1]
+      });
       
       return true;
     } catch (error) {
@@ -766,7 +795,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const getLeadSourcesBySchool = (schoolId: string): LeadSource[] => {
-    return leadSources.filter(ls => ls.schoolId === schoolId);
+    console.log('🔍 Debug - getLeadSourcesBySchool - TODAS as fontes:', leadSources.map(s => ({
+      id: s.id,
+      name: s.name,
+      active: s.active,
+      schoolId: s.schoolId,
+      type: s.type
+    })));
+    
+    const filteredSources = leadSources.filter(ls => ls.schoolId === schoolId);
+    console.log('🔍 Debug - getLeadSourcesBySchool:', {
+      schoolId,
+      totalSources: leadSources.length,
+      filteredSources: filteredSources.length,
+      sources: filteredSources.map(s => ({ id: s.id, name: s.name, active: s.active, type: s.type }))
+    });
+    return filteredSources;
+  };
+
+  // Função para forçar recriação das fontes padrão
+  const recreateDefaultLeadSources = (schoolId: string): void => {
+    console.log('🔧 Recriando fontes padrão para escola:', schoolId);
+    
+    // Criar fontes padrão para a escola específica
+    const defaultSources = DEFAULT_LEAD_SOURCES.map((source, index) => ({
+      ...source,
+      id: `${schoolId}_${source.name.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}${index}`,
+      schoolId: schoolId,
+      createdAt: new Date()
+    }));
+
+    // Filtrar fontes de outras escolas
+    const otherSchoolsSources = leadSources.filter(ls => ls.schoolId !== schoolId);
+    
+    // Combinar fontes de outras escolas com as novas fontes padrão
+    const updatedLeadSources = [...otherSchoolsSources, ...defaultSources];
+    
+    setLeadSources(updatedLeadSources);
+    localStorage.setItem('crm_lead_sources', JSON.stringify(updatedLeadSources));
+    
+    console.log('🔧 Fontes padrão recriadas:', {
+      schoolId,
+      newSourcesCount: defaultSources.length,
+      totalSources: updatedLeadSources.length
+    });
   };
 
   const toggleLeadSource = async (id: string): Promise<boolean> => {
@@ -1289,6 +1361,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     deleteLeadSource,
     getLeadSourcesBySchool,
     toggleLeadSource,
+    recreateDefaultLeadSources,
     registerLead,
     updateLead,
     deleteLead,

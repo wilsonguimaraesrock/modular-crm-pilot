@@ -7,11 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Users, MessageSquare, Calendar, Send, TrendingUp, Plus, Phone, Mail, Clock, User, ArrowLeft, FileText, AlertCircle, CheckCircle } from 'lucide-react';
-import { motion } from 'framer-motion';
-import { useState, useEffect } from 'react';
+import { Users, MessageSquare, Calendar, Send, TrendingUp, Plus, Phone, Mail, Clock, User, ArrowLeft, FileText, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect, useRef } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { useAuth, Lead, FollowUp } from '@/contexts/AuthContext';
+import { useDatabaseAuth, Lead, FollowUp } from '@/contexts/DatabaseAuthContext';
 import { toast } from '@/components/ui/use-toast';
 
 interface DashboardOverviewProps {
@@ -20,7 +20,7 @@ interface DashboardOverviewProps {
 
 export const DashboardOverview = ({ onNavigate }: DashboardOverviewProps) => {
   const isMobile = useIsMobile();
-  const { user, getLeadStats, getLeadsBySchool, updateLead, getFollowUpsByLead, createFollowUp, getSellersBySchool } = useAuth();
+  const { user, getLeadStats, getLeadsBySchool, updateLead, getFollowUpsByLead, createFollowUp, getSellersBySchool } = useDatabaseAuth();
   
   // Estados para o modal de detalhes do lead
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -35,6 +35,11 @@ export const DashboardOverview = ({ onNavigate }: DashboardOverviewProps) => {
     notes: ''
   });
   
+  // Estados para atualização automática
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [newLeadNotification, setNewLeadNotification] = useState(false);
+  const previousLeadsRef = useRef<typeof schoolLeads>([]);
+  
   // Obter estatísticas reais do contexto
   const stats = user ? getLeadStats(user.schoolId) : {
     leadsHoje: 0,
@@ -46,6 +51,49 @@ export const DashboardOverview = ({ onNavigate }: DashboardOverviewProps) => {
 
   const schoolLeads = user ? getLeadsBySchool(user.schoolId) : [];
   const sellers = user ? getSellersBySchool(user.schoolId) : [];
+
+  // Sistema de atualização automática
+  useEffect(() => {
+    // Verificar se há novos leads
+    if (schoolLeads.length > previousLeadsRef.current.length) {
+      const newLeads = schoolLeads.filter(lead => 
+        !previousLeadsRef.current.some(prevLead => prevLead.id === lead.id)
+      );
+      
+      if (newLeads.length > 0) {
+        console.log('🆕 Novos leads detectados no Dashboard:', newLeads);
+        setNewLeadNotification(true);
+        
+        // Mostrar toast para cada novo lead
+        newLeads.forEach(lead => {
+          toast({
+            title: "🆕 Novo Lead no Pipeline!",
+            description: `${lead.name} - ${lead.source}`,
+            duration: 4000,
+          });
+        });
+        
+        // Esconder notificação após 5 segundos
+        setTimeout(() => setNewLeadNotification(false), 5000);
+      }
+    }
+    
+    // Atualizar referência
+    previousLeadsRef.current = schoolLeads;
+  }, [schoolLeads, toast]);
+
+  // Função para atualização manual
+  const handleManualRefresh = () => {
+    setIsRefreshing(true);
+    
+    toast({
+      title: "🔄 Atualizando Dashboard...",
+      description: "Dados atualizados",
+      duration: 2000,
+    });
+    
+    setTimeout(() => setIsRefreshing(false), 1000);
+  };
 
   // Função para abrir modal de detalhes do lead
   const openLeadModal = (lead: Lead) => {
@@ -320,12 +368,44 @@ export const DashboardOverview = ({ onNavigate }: DashboardOverviewProps) => {
       <motion.div variants={item}>
         <Card className="bg-slate-800/50 backdrop-blur-sm border-slate-700">
           <CardHeader className={isMobile ? 'p-4 pb-2' : ''}>
-            <CardTitle className={`${
-              isMobile ? 'text-lg' : 'text-xl'
-            } font-semibold text-white flex items-center`}>
-              <TrendingUp className="mr-2" size={isMobile ? 18 : 20} />
-              Pipeline de Vendas
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className={`${
+                isMobile ? 'text-lg' : 'text-xl'
+              } font-semibold text-white flex items-center`}>
+                <TrendingUp className="mr-2" size={isMobile ? 18 : 20} />
+                Pipeline de Vendas
+              </CardTitle>
+              <div className="flex items-center space-x-2">
+                {/* Notificação de novos leads */}
+                <AnimatePresence>
+                  {newLeadNotification && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                      className="bg-green-500 text-white px-2 py-1 rounded-full text-xs font-medium"
+                    >
+                      🆕 Novo!
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                
+                {/* Botão de atualização */}
+                <Button
+                  onClick={handleManualRefresh}
+                  disabled={isRefreshing}
+                  variant="outline"
+                  size={isMobile ? "sm" : "default"}
+                  className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-blue-500/30"
+                >
+                  <RefreshCw 
+                    className={`mr-1 ${isRefreshing ? 'animate-spin' : ''}`} 
+                    size={isMobile ? 14 : 16} 
+                  />
+                  {isMobile ? '' : 'Atualizar'}
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className={isMobile ? 'p-4 pt-2' : ''}>
             {schoolLeads.length === 0 ? (

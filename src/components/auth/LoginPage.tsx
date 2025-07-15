@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Building2, User, Mail, Lock, LogIn, UserPlus } from 'lucide-react';
 import { RockfellerLogo } from '@/components/ui/logo';
 import { motion } from 'framer-motion';
-import { useAuth } from '@/contexts/AuthContext';
+import { useDatabaseAuth } from '@/contexts/DatabaseAuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -18,7 +18,7 @@ interface LoginFormData {
 
 export const LoginPage = () => {
   const isMobile = useIsMobile();
-  const { loginAsSchool, loginAsSeller, isLoading } = useAuth();
+  const { loginAsSchool, loginAsSeller, isLoading } = useDatabaseAuth();
   const { toast } = useToast();
   
   const [schoolForm, setSchoolForm] = useState<LoginFormData>({
@@ -188,7 +188,7 @@ export const LoginPage = () => {
                           onChange={(e) => setSchoolForm({...schoolForm, email: e.target.value})}
                           className={`${
                             isMobile ? 'pl-10 h-12 text-sm' : 'pl-12'
-                          } bg-slate-700/50 border-slate-600 text-white`}
+                          } bg-slate-800/50 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20`}
                           placeholder="admin@rockfeller.com.br"
                           required
                         />
@@ -212,7 +212,7 @@ export const LoginPage = () => {
                           onChange={(e) => setSchoolForm({...schoolForm, password: e.target.value})}
                           className={`${
                             isMobile ? 'pl-10 h-12 text-sm' : 'pl-12'
-                          } bg-slate-700/50 border-slate-600 text-white`}
+                          } bg-slate-800/50 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20`}
                           placeholder="Digite sua senha"
                           required
                         />
@@ -254,7 +254,7 @@ export const LoginPage = () => {
                           onChange={(e) => setSellerForm({...sellerForm, email: e.target.value})}
                           className={`${
                             isMobile ? 'pl-10 h-12 text-sm' : 'pl-12'
-                          } bg-slate-700/50 border-slate-600 text-white`}
+                          } bg-slate-800/50 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20`}
                           placeholder="vendedor@rockfeller.com.br"
                           required
                         />
@@ -278,7 +278,7 @@ export const LoginPage = () => {
                           onChange={(e) => setSellerForm({...sellerForm, password: e.target.value})}
                           className={`${
                             isMobile ? 'pl-10 h-12 text-sm' : 'pl-12'
-                          } bg-slate-700/50 border-slate-600 text-white`}
+                          } bg-slate-800/50 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20`}
                           placeholder="Digite sua senha"
                           required
                         />

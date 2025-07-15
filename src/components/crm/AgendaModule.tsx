@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Calendar, Clock, User, Plus, CheckCircle, AlertCircle, TrendingUp, Target, Filter, CalendarDays, BarChart3 } from 'lucide-react';
-import { useAuth, Task } from '@/contexts/AuthContext';
+import { useDatabaseAuth, Task } from '@/contexts/DatabaseAuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { motion } from 'framer-motion';
 
@@ -330,7 +330,7 @@ interface NewTaskData {
 }
 
 export const AgendaModule = () => {
-  const { user, getAllTasksForAgenda, getTaskStats, updateTask, createTask, getSellersBySchool } = useAuth();
+  const { user, getAllTasksForAgenda, getTaskStats, updateTask, createTask, getSellersBySchool } = useDatabaseAuth();
   const isMobile = useIsMobile();
   const [view, setView] = useState<CalendarView>('daily');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());

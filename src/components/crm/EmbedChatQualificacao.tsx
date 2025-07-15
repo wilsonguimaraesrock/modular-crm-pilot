@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Send, Bot, MessageCircle, RotateCcw, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/contexts/AuthContext';
+import { useDatabaseAuth } from '@/contexts/DatabaseAuthContext';
 
 interface Message {
   type: 'user' | 'ai' | 'system';
@@ -14,7 +14,7 @@ interface Message {
 
 export const EmbedChatQualificacao = ({ schoolId }: { schoolId: string }) => {
   const { toast } = useToast();
-  const { getSellersBySchool, schools } = useAuth();
+  const { getSellersBySchool, schools } = useDatabaseAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [messages, setMessages] = useState<Message[]>([
@@ -354,7 +354,7 @@ Antes de começarmos, Qual é o seu nome?`;
                     onChange={(e) => setCurrentMessage(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
                     placeholder="Digite sua mensagem..."
-                    className="bg-slate-700/50 border-slate-600 text-white placeholder-slate-400"
+                    className="bg-slate-800/50 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 placeholder-slate-400"
                   />
                   <Button
                     onClick={handleSendMessage}

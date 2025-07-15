@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Send, Bot, Settings, Brain, FileText, X, MessageCircle, Code, Copy, ExternalLink, RotateCcw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { useAuth, Seller, QualificationConversation } from '@/contexts/AuthContext';
+import { useDatabaseAuth, Seller, QualificationConversation } from '@/contexts/DatabaseAuthContext';
 
 interface QualificationStage {
   id: string;
@@ -31,7 +31,7 @@ export const LeadQualification = () => {
     getActiveQualificationConversation,
     registerLead,
     createAppointment
-  } = useAuth();
+  } = useDatabaseAuth();
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -1182,7 +1182,7 @@ Prefere uma conversa online ou presencial na nossa escola?`;
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 placeholder="AIzaSy..."
-                className={`bg-slate-700/50 border-slate-600 text-white ${
+                className={`bg-slate-800/50 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 ${
                   isMobile ? 'h-12' : ''
                 }`}
               />
@@ -1576,7 +1576,7 @@ Prefere uma conversa online ou presencial na nossa escola?`;
                     ? "Digite sua mensagem..."
                     : "Digite sua mensagem..."
                 }
-                className={`bg-slate-700/50 border-slate-600 text-white ${
+                className={`bg-slate-800/50 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 ${
                   isMobile ? 'h-12 text-sm' : ''
                 }`}
                 disabled={false}

@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calendar, Clock, User, Phone, CheckCircle, XCircle, AlertCircle, BarChart3, TrendingUp, Users } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { motion } from 'framer-motion';
-import { useAuth } from '@/contexts/AuthContext';
+import { useDatabaseAuth } from '@/contexts/DatabaseAuthContext';
 import { format, isToday, isTomorrow, isAfter, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -18,7 +18,7 @@ interface AttendanceStatus {
 }
 
 export const AttendanceModule = () => {
-  const { user, getAppointmentsBySchool, updateAppointment, getSellersBySchool } = useAuth();
+  const { user, getAppointmentsBySchool, updateAppointment, getSellersBySchool } = useDatabaseAuth();
   const isMobile = useIsMobile();
   const [selectedMonth, setSelectedMonth] = useState<string>(format(new Date(), 'yyyy-MM'));
   const [attendanceStatuses, setAttendanceStatuses] = useState<AttendanceStatus[]>([]);

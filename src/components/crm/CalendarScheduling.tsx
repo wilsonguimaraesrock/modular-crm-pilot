@@ -4,11 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { motion } from 'framer-motion';
-import { useAuth } from '@/contexts/AuthContext';
+import { useDatabaseAuth } from '@/contexts/DatabaseAuthContext';
 
 export const CalendarScheduling = () => {
   const isMobile = useIsMobile();
-  const { user, getAppointmentsBySchool, createAppointment } = useAuth();
+  const { user, getAppointmentsBySchool, createAppointment } = useDatabaseAuth();
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedTime, setSelectedTime] = useState<string>('');
 
@@ -73,7 +73,7 @@ export const CalendarScheduling = () => {
                     type="date"
                     value={selectedDate}
                     onChange={(e) => setSelectedDate(e.target.value)}
-                    className={`w-full bg-slate-700/50 border-slate-600 text-white rounded-lg ${
+                    className={`w-full bg-slate-800/50 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 rounded-lg ${
                       isMobile ? 'p-3 h-12' : 'p-2'
                     }`}
                     min={new Date().toISOString().split('T')[0]}

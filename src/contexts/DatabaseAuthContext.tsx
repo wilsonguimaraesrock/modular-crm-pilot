@@ -214,6 +214,24 @@ interface DatabaseAuthContextType {
     taxaConversao: number;
   };
   
+  // FollowUp functions
+  createFollowUp: (data: Omit<FollowUp, 'id' | 'createdAt' | 'updatedAt'>) => Promise<boolean>;
+  getFollowUpsByLead: (leadId: string) => FollowUp[];
+  updateFollowUp: (id: string, data: Partial<FollowUp>) => Promise<boolean>;
+  deleteFollowUp: (id: string) => Promise<boolean>;
+  
+  // Task functions
+  createTask: (data: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => Promise<boolean>;
+  updateTask: (id: string, data: Partial<Task>) => Promise<boolean>;
+  deleteTask: (id: string) => Promise<boolean>;
+  getAllTasksForAgenda: (schoolId: string) => Task[];
+  getTaskStats: (schoolId: string) => {
+    total: number;
+    completed: number;
+    pending: number;
+    overdue: number;
+  };
+  
   // Other functions similar to original context...
   refreshData: () => Promise<void>;
 }
@@ -280,7 +298,24 @@ export const DatabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
       setFollowUps(followUpsData);
       setTasks(tasksData);
       
-      console.log('✅ Dados carregados do banco MySQL');
+      console.log('✅ Dados carregados do banco MySQL:', {
+        schools: schoolsData.length,
+        sellers: sellersData.length,
+        leadSources: leadSourcesData.length,
+        leads: leadsData.length,
+        appointments: appointmentsData.length,
+        conversations: conversationsData.length,
+        followUps: followUpsData.length,
+        tasks: tasksData.length
+      });
+      
+      console.log('🔍 Debug - Fontes de leads carregadas:', leadSourcesData.map(s => ({
+        id: s.id,
+        name: s.name,
+        active: s.active,
+        schoolId: s.schoolId,
+        type: s.type
+      })));
       
     } catch (error) {
       console.error('❌ Erro ao carregar dados do banco:', error);
@@ -481,6 +516,11 @@ export const DatabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
   // CRUD functions for Lead Sources
   const registerLeadSource = async (data: Omit<LeadSource, 'id' | 'createdAt'>): Promise<boolean> => {
     try {
+      console.log('🔍 Debug - Criando fonte de lead no MySQL:', {
+        originalData: data,
+        currentLeadSourcesCount: leadSources.length
+      });
+
       const newLeadSource = await prisma.leadSource.create({
         data: {
           ...data,
@@ -490,6 +530,13 @@ export const DatabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
         }
       });
       
+      console.log('🔍 Debug - Fonte criada no MySQL:', {
+        newSourceId: newLeadSource.id,
+        newSourceName: newLeadSource.name,
+        active: newLeadSource.active,
+        schoolId: newLeadSource.schoolId
+      });
+
       setLeadSources(prev => [...prev, newLeadSource]);
       return true;
     } catch (error) {
@@ -525,7 +572,14 @@ export const DatabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
   };
 
   const getLeadSourcesBySchool = (schoolId: string): LeadSource[] => {
-    return leadSources.filter(ls => ls.schoolId === schoolId);
+    const filteredSources = leadSources.filter(ls => ls.schoolId === schoolId);
+    console.log('🔍 Debug - getLeadSourcesBySchool (MySQL):', {
+      schoolId,
+      totalSources: leadSources.length,
+      filteredSources: filteredSources.length,
+      sources: filteredSources.map(s => ({ id: s.id, name: s.name, active: s.active, type: s.type }))
+    });
+    return filteredSources;
   };
 
   const toggleLeadSource = async (id: string): Promise<boolean> => {
@@ -716,6 +770,120 @@ export const DatabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
     };
   };
 
+  // CRUD functions for FollowUps
+  const createFollowUp = async (data: Omit<FollowUp, 'id' | 'createdAt' | 'updatedAt'>): Promise<boolean> => {
+    try {
+      const newFollowUp = await prisma.followUp.create({
+        data: {
+          ...data,
+          scheduledDate: new Date(data.scheduledDate),
+          status: 'pending', // Default status
+          notes: data.notes || null
+        }
+      });
+      setFollowUps(prev => [...prev, newFollowUp]);
+      return true;
+    } catch (error) {
+      console.error('Erro ao criar follow-up:', error);
+      return false;
+    }
+  };
+
+  const getFollowUpsByLead = (leadId: string): FollowUp[] => {
+    return followUps.filter(fu => fu.leadId === leadId);
+  };
+
+  const updateFollowUp = async (id: string, data: Partial<FollowUp>): Promise<boolean> => {
+    try {
+      const updatedFollowUp = await prisma.followUp.update({
+        where: { id },
+        data
+      });
+      setFollowUps(prev => prev.map(fu => fu.id === id ? updatedFollowUp : fu));
+      return true;
+    } catch (error) {
+      console.error('Erro ao atualizar follow-up:', error);
+      return false;
+    }
+  };
+
+  const deleteFollowUp = async (id: string): Promise<boolean> => {
+    try {
+      await prisma.followUp.delete({ where: { id } });
+      setFollowUps(prev => prev.filter(fu => fu.id !== id));
+      return true;
+    } catch (error) {
+      console.error('Erro ao deletar follow-up:', error);
+      return false;
+    }
+  };
+
+  // CRUD functions for Tasks
+  const createTask = async (data: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>): Promise<boolean> => {
+    try {
+      const newTask = await prisma.task.create({
+        data: {
+          ...data,
+          scheduledDate: new Date(data.scheduledDate),
+          status: 'pending', // Default status
+          notes: data.notes || null
+        }
+      });
+      setTasks(prev => [...prev, newTask]);
+      return true;
+    } catch (error) {
+      console.error('Erro ao criar tarefa:', error);
+      return false;
+    }
+  };
+
+  const updateTask = async (id: string, data: Partial<Task>): Promise<boolean> => {
+    try {
+      const updatedTask = await prisma.task.update({
+        where: { id },
+        data
+      });
+      setTasks(prev => prev.map(t => t.id === id ? updatedTask : t));
+      return true;
+    } catch (error) {
+      console.error('Erro ao atualizar tarefa:', error);
+      return false;
+    }
+  };
+
+  const deleteTask = async (id: string): Promise<boolean> => {
+    try {
+      await prisma.task.delete({ where: { id } });
+      setTasks(prev => prev.filter(t => t.id !== id));
+      return true;
+    } catch (error) {
+      console.error('Erro ao deletar tarefa:', error);
+      return false;
+    }
+  };
+
+  const getAllTasksForAgenda = (schoolId: string): Task[] => {
+    return tasks.filter(t => t.schoolId === schoolId);
+  };
+
+  const getTaskStats = (schoolId: string) => {
+    const schoolTasks = tasks.filter(t => t.schoolId === schoolId);
+    const total = schoolTasks.length;
+    const completed = schoolTasks.filter(t => t.status === 'completed').length;
+    const pending = schoolTasks.filter(t => t.status === 'pending').length;
+    const overdue = schoolTasks.filter(t => {
+      const scheduledDate = new Date(t.scheduledDate);
+      return scheduledDate < new Date() && t.status !== 'completed';
+    }).length;
+
+    return {
+      total,
+      completed,
+      pending,
+      overdue
+    };
+  };
+
   const value: DatabaseAuthContextType = {
     user,
     schools,
@@ -753,6 +921,15 @@ export const DatabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
     deleteAppointment,
     getAppointmentsBySchool,
     getAttendanceStats,
+    createFollowUp,
+    getFollowUpsByLead,
+    updateFollowUp,
+    deleteFollowUp,
+    createTask,
+    updateTask,
+    deleteTask,
+    getAllTasksForAgenda,
+    getTaskStats,
     refreshData
   };
 

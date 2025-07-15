@@ -1,7 +1,34 @@
+/**
+ * 🎯 WebhookManager - Sistema de Integração com Landing Pages
+ * 
+ * Este componente gerencia a recepção e processamento de leads vindos de
+ * landing pages externas através de webhooks e URL parameters.
+ * 
+ * Funcionalidades:
+ * - Recebe leads via URL parameters (método CORS-safe)
+ * - Processa dados automaticamente
+ * - Atribui leads à escola e vendedor corretos
+ * - Mostra notificações de sucesso
+ * - Suporte a múltiplas origens
+ * 
+ * @version 2.0 - Sistema de Integração Completo
+ * @date 2025-01-09
+ */
+
 import { useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useDatabaseAuth } from '@/contexts/DatabaseAuthContext';
 import { useToast } from '@/hooks/use-toast';
 
+/**
+ * Interface para dados de leads vindos de landing pages
+ * 
+ * @property name - Nome completo do lead
+ * @property email - Email do lead
+ * @property phone - Telefone do lead
+ * @property interests - Interesse em cursos (Adults, Teens, Kids, etc.)
+ * @property modality - Modalidade preferida (Presencial, Online)
+ * @property source - Origem do lead (opcional, para tracking)
+ */
 interface WebhookLead {
   name: string;
   email: string;
@@ -12,15 +39,25 @@ interface WebhookLead {
 }
 
 export const WebhookManager = () => {
-  const { registerLead } = useAuth();
+  const { registerLead } = useDatabaseAuth();
   const { toast } = useToast();
 
   useEffect(() => {
-    // Expor função global para receber leads da landing page
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (window as any).receiveLeadFromLandingPage = async (leadData: WebhookLead) => {
+    /**
+     * Processa dados de lead vindos de landing pages
+     * 
+     * Esta função:
+     * 1. Mapeia dados da landing page para formato do CRM
+     * 2. Atribui configurações padrão (escola, vendedor, score)
+     * 3. Registra o lead no sistema
+     * 4. Mostra notificação de sucesso
+     * 
+     * @param leadData - Dados do lead vindos da landing page
+     * @returns Promise com resultado do processamento
+     */
+    const processLeadData = async (leadData: WebhookLead) => {
       try {
-        console.log('📨 Lead recebido da landing page:', leadData);
+        console.log('📨 Processando lead:', leadData);
 
         // Mapear dados da landing page para formato do CRM
         const crmLead = {
@@ -34,7 +71,7 @@ export const WebhookManager = () => {
           score: 80, // Score alto para leads da landing page
           status: 'novo' as const,
           schoolId: '2', // ID da Escola Navegantes
-          assignedTo: 'seller_test_2', // Tatiana Venga
+          assignedTo: 'seller_test_2', // Tatiana Venga (vendedor padrão)
           goals: 'Interessado em aula experimental gratuita',
           experience: 'A definir na qualificação',
           availability: 'A definir',
@@ -45,13 +82,13 @@ export const WebhookManager = () => {
 
         if (success) {
           console.log('✅ Lead cadastrado com sucesso no CRM');
+          
           toast({
             title: "✅ Lead Recebido!",
-            description: `${leadData.name} foi cadastrado com sucesso`,
+            description: `${leadData.name} foi cadastrado via URL parameters`,
             duration: 5000,
           });
 
-          // Retornar sucesso para a landing page
           return {
             success: true,
             message: 'Lead cadastrado com sucesso!',
@@ -76,7 +113,48 @@ export const WebhookManager = () => {
       }
     };
 
-    // Configurar listener para postMessage (método alternativo)
+    /**
+     * Captura leads via URL parameters (método CORS-safe)
+     * 
+     * Este método contorna problemas de CORS entre diferentes origens
+     * (ex: Vercel HTTPS → localhost HTTP) usando URL parameters
+     * em vez de PostMessage.
+     */
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('leadData')) {
+      try {
+        const leadDataEncoded = urlParams.get('leadData');
+        const leadData = JSON.parse(decodeURIComponent(leadDataEncoded || ''));
+        console.log('📨 Lead recebido via URL parameters:', leadData);
+        
+        // Processar lead automaticamente
+        processLeadData(leadData);
+        
+        // Limpar URL parameters para não reprocessar
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+      } catch (error) {
+        console.error('❌ Erro ao processar lead dos URL parameters:', error);
+      }
+    }
+
+    /**
+     * Expor função global para receber leads da landing page
+     * 
+     * Esta função pode ser chamada diretamente por JavaScript
+     * na landing page para enviar leads via PostMessage.
+     * 
+     * @deprecated Use URL parameters em vez de PostMessage (problemas de CORS)
+     */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).receiveLeadFromLandingPage = processLeadData;
+
+    /**
+     * Configurar listener para postMessage (método alternativo)
+     * 
+     * @deprecated Este método não funciona devido a problemas de CORS
+     * entre diferentes origens (HTTPS → HTTP). Use URL parameters.
+     */
     const handleMessage = async (event: MessageEvent) => {
       // Validar origem da mensagem (adicione suas URLs permitidas)
       const allowedOrigins = [

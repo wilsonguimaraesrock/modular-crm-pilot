@@ -7,17 +7,17 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { UserPlus, Globe, Facebook, Instagram, Linkedin, Mail, Phone, MapPin, Building, GraduationCap, Users } from 'lucide-react';
-import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { UserPlus, Globe, Facebook, Instagram, Linkedin, Mail, Phone, MapPin, Building, GraduationCap, Users, RefreshCw } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { useAuth } from '@/contexts/AuthContext';
+import { useDatabaseAuth } from '@/contexts/DatabaseAuthContext';
 
 export const LeadCapture = () => {
   const isMobile = useIsMobile();
   const { toast } = useToast();
-  const { user, registerLead, getLeadsBySchool, getLeadStats, getLeadSourcesBySchool } = useAuth();
+  const { user, registerLead, getLeadsBySchool, getLeadStats, getLeadSourcesBySchool } = useDatabaseAuth();
   
   const [formData, setFormData] = useState({
     name: '',
@@ -38,6 +38,10 @@ export const LeadCapture = () => {
 
   const [autoQualification, setAutoQualification] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastLeadCount, setLastLeadCount] = useState(0);
+  const [newLeadNotification, setNewLeadNotification] = useState(false);
+  const previousLeadsRef = useRef<typeof schoolLeads>([]);
 
   // Obter dados do contexto
   const schoolLeads = user ? getLeadsBySchool(user.schoolId) : [];
@@ -48,6 +52,50 @@ export const LeadCapture = () => {
     fechados: 0,
     novosLeads: 0
   };
+
+
+
+  // Sistema de atualização automática
+  useEffect(() => {
+    // Verificar se há novos leads
+    if (schoolLeads.length > previousLeadsRef.current.length) {
+      const newLeads = schoolLeads.filter(lead => 
+        !previousLeadsRef.current.some(prevLead => prevLead.id === lead.id)
+      );
+      
+      if (newLeads.length > 0) {
+        console.log('🆕 Novos leads detectados:', newLeads);
+        setNewLeadNotification(true);
+        
+        // Mostrar toast para cada novo lead
+        newLeads.forEach(lead => {
+          toast({
+            title: "🆕 Novo Lead Recebido!",
+            description: `${lead.name} - ${lead.source}`,
+            duration: 4000,
+          });
+        });
+        
+        // Esconder notificação após 5 segundos
+        setTimeout(() => setNewLeadNotification(false), 5000);
+      }
+    }
+    
+    // Atualizar referência
+    previousLeadsRef.current = schoolLeads;
+  }, [schoolLeads, toast]);
+
+  // Atualização automática a cada 10 segundos
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (user) {
+        // Forçar re-render para atualizar dados
+        setLastLeadCount(schoolLeads.length);
+      }
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [user, schoolLeads.length]);
   const schoolLeadSources = user ? getLeadSourcesBySchool(user.schoolId) : [];
 
   const sources = [
@@ -133,6 +181,21 @@ export const LeadCapture = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Função para atualização manual
+  const handleManualRefresh = () => {
+    setIsRefreshing(true);
+    // Forçar re-render
+    setLastLeadCount(schoolLeads.length);
+    
+    toast({
+      title: "🔄 Atualizando...",
+      description: "Pipeline atualizado",
+      duration: 2000,
+    });
+    
+    setTimeout(() => setIsRefreshing(false), 1000);
   };
 
   const container = {
@@ -222,7 +285,7 @@ export const LeadCapture = () => {
                             id="name"
                             value={formData.name}
                             onChange={(e) => setFormData({...formData, name: e.target.value})}
-                            className={`bg-slate-700/50 border-slate-600 text-white ${
+                            className={`bg-slate-800/50 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 ${
                               isMobile ? 'h-12' : ''
                             }`}
                             placeholder="Nome completo"
@@ -240,7 +303,7 @@ export const LeadCapture = () => {
                             type="email"
                             value={formData.email}
                             onChange={(e) => setFormData({...formData, email: e.target.value})}
-                            className={`bg-slate-700/50 border-slate-600 text-white ${
+                            className={`bg-slate-800/50 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 ${
                               isMobile ? 'h-12' : ''
                             }`}
                             placeholder="email@exemplo.com"
@@ -257,7 +320,7 @@ export const LeadCapture = () => {
                             id="phone"
                             value={formData.phone}
                             onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                            className={`bg-slate-700/50 border-slate-600 text-white ${
+                            className={`bg-slate-800/50 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 ${
                               isMobile ? 'h-12' : ''
                             }`}
                             placeholder="(11) 99999-9999"
@@ -273,7 +336,7 @@ export const LeadCapture = () => {
                             id="age"
                             value={formData.age}
                             onChange={(e) => setFormData({...formData, age: e.target.value})}
-                            className={`bg-slate-700/50 border-slate-600 text-white ${
+                            className={`bg-slate-800/50 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 ${
                               isMobile ? 'h-12' : ''
                             }`}
                             placeholder="Ex: 25 anos"
@@ -298,7 +361,7 @@ export const LeadCapture = () => {
                             Método *
                           </Label>
                           <Select value={formData.method} onValueChange={(value) => setFormData({...formData, method: value})}>
-                            <SelectTrigger className={`bg-slate-700/50 border-slate-600 text-white ${
+                            <SelectTrigger className={`bg-slate-800/50 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 ${
                               isMobile ? 'h-12' : ''
                             }`}>
                               <SelectValue placeholder="Selecione o método" />
@@ -319,7 +382,7 @@ export const LeadCapture = () => {
                             Modalidade *
                           </Label>
                           <Select value={formData.modality} onValueChange={(value) => setFormData({...formData, modality: value})}>
-                            <SelectTrigger className={`bg-slate-700/50 border-slate-600 text-white ${
+                            <SelectTrigger className={`bg-slate-800/50 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 ${
                               isMobile ? 'h-12' : ''
                             }`}>
                               <SelectValue placeholder="Selecione a modalidade" />
@@ -343,7 +406,7 @@ export const LeadCapture = () => {
                             id="experience"
                             value={formData.experience}
                             onChange={(e) => setFormData({...formData, experience: e.target.value})}
-                            className={`bg-slate-700/50 border-slate-600 text-white ${
+                            className={`bg-slate-800/50 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 ${
                               isMobile ? 'h-12' : ''
                             }`}
                             placeholder="Ex: Básico, Intermediário, Avançado"
@@ -359,7 +422,7 @@ export const LeadCapture = () => {
                             id="availability"
                             value={formData.availability}
                             onChange={(e) => setFormData({...formData, availability: e.target.value})}
-                            className={`bg-slate-700/50 border-slate-600 text-white ${
+                            className={`bg-slate-800/50 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 ${
                               isMobile ? 'h-12' : ''
                             }`}
                             placeholder="Ex: Manhã, Tarde, Noite"
@@ -383,7 +446,7 @@ export const LeadCapture = () => {
                             id="budget"
                             value={formData.budget}
                             onChange={(e) => setFormData({...formData, budget: e.target.value})}
-                            className={`bg-slate-700/50 border-slate-600 text-white ${
+                            className={`bg-slate-800/50 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 ${
                               isMobile ? 'h-12' : ''
                             }`}
                             placeholder="Ex: R$ 500,00"
@@ -396,7 +459,7 @@ export const LeadCapture = () => {
                             Fonte
                           </Label>
                           <Select value={formData.source} onValueChange={(value) => setFormData({...formData, source: value})}>
-                            <SelectTrigger className={`bg-slate-700/50 border-slate-600 text-white ${
+                            <SelectTrigger className={`bg-slate-800/50 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 ${
                               isMobile ? 'h-12' : ''
                             }`}>
                               <SelectValue />
@@ -421,7 +484,7 @@ export const LeadCapture = () => {
                           id="goals"
                           value={formData.goals}
                           onChange={(e) => setFormData({...formData, goals: e.target.value})}
-                          className={`bg-slate-700/50 border-slate-600 text-white ${
+                          className={`bg-slate-800/50 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 ${
                             isMobile ? 'min-h-20' : 'min-h-24'
                           }`}
                           placeholder="Ex: Trabalho, viagem, estudos, hobby..."
@@ -609,11 +672,43 @@ export const LeadCapture = () => {
         <TabsContent value="recent">
           <Card className="bg-slate-800/50 backdrop-blur-sm border-slate-700">
             <CardHeader className={isMobile ? 'p-4 pb-2' : ''}>
-              <CardTitle className={`text-white ${
-                isMobile ? 'text-lg' : ''
-              }`}>
-                Leads Recentes
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className={`text-white ${
+                  isMobile ? 'text-lg' : ''
+                }`}>
+                  Leads Recentes
+                </CardTitle>
+                <div className="flex items-center space-x-2">
+                  {/* Notificação de novos leads */}
+                  <AnimatePresence>
+                    {newLeadNotification && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        className="bg-green-500 text-white px-2 py-1 rounded-full text-xs font-medium"
+                      >
+                        🆕 Novo!
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                  
+                  {/* Botão de atualização */}
+                  <Button
+                    onClick={handleManualRefresh}
+                    disabled={isRefreshing}
+                    variant="outline"
+                    size={isMobile ? "sm" : "default"}
+                    className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-blue-500/30"
+                  >
+                    <RefreshCw 
+                      className={`mr-1 ${isRefreshing ? 'animate-spin' : ''}`} 
+                      size={isMobile ? 14 : 16} 
+                    />
+                    {isMobile ? '' : 'Atualizar'}
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent className={isMobile ? 'p-4 pt-2' : ''}>
               {schoolLeads.length === 0 ? (
@@ -692,7 +787,7 @@ export const LeadCapture = () => {
                         <span className={`text-slate-400 ${
                           isMobile ? 'text-xs' : 'text-sm'
                         }`}>
-                          {new Date(lead.timestamp).toLocaleTimeString()}
+                          {new Date(lead.createdAt).toLocaleTimeString()}
                         </span>
                       </div>
                     </motion.div>

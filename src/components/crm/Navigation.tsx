@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 import { motion } from 'framer-motion';
-import { useAuth } from '@/contexts/AuthContext';
+import { useDatabaseAuth } from '@/contexts/DatabaseAuthContext';
 
 interface NavigationProps {
   activeModule: string;
@@ -24,7 +24,7 @@ interface NavigationProps {
 }
 
 export const Navigation = ({ activeModule, setActiveModule, isMobile = false }: NavigationProps) => {
-  const { user, logout } = useAuth();
+  const { user, logout } = useDatabaseAuth();
   
   // Filtrar módulos baseado no tipo de usuário
   const allModules = [
