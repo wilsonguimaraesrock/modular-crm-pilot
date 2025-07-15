@@ -282,7 +282,7 @@ const MOCK_SCHOOLS: School[] = [
   {
     id: '2',
     name: 'Rockfeller Navegantes',
-    email: 'admin@navegantes.com.br',
+    email: 'navegantes@rockfellerbrasil.com.br',
     phone: '(47) 9 9999-9999',
     address: 'Rua das Navegantes, 123 - Navegantes/SC',
     createdAt: new Date()
@@ -395,7 +395,7 @@ const getMockPasswords = (): Record<string, string> => {
   const defaultPasswords = { 
     'admin@rockfeller.com.br': 'admin123',
     'ricardo@rockfeller.com.br': 'ricardo123',
-    'admin@navegantes.com.br': 'navegantes123',
+    'navegantes@rockfellerbrasil.com.br': 'S@lmos2714',
     'tatiana.direito@hotmail.com': 'tatiana123'
   };
   try {
