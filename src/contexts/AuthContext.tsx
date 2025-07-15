@@ -72,7 +72,7 @@ export interface Appointment {
   date: string;
   time: string;
   type: 'presencial' | 'online';
-  status: 'agendado' | 'confirmado' | 'realizado' | 'cancelado' | 'remarcado';
+  status: 'agendado' | 'confirmado' | 'realizado' | 'cancelado' | 'remarcado' | 'compareceu' | 'nao_compareceu' | 'em_fechamento' | 'matriculou' | 'nao_matriculou';
   schoolId: string;
   assignedTo?: string; // ID do vendedor
   notes?: string;
@@ -207,6 +207,36 @@ interface AuthContextType {
   deleteAppointment: (id: string) => Promise<boolean>;
   getAppointmentsBySchool: (schoolId: string) => Appointment[];
   
+  // Attendance statistics functions
+  getAttendanceStats: (schoolId: string, month?: string) => {
+    totalAgendados: number;
+    compareceram: number;
+    matricularam: number;
+    naoCompareceram: number;
+    taxaComparecimento: number;
+    taxaMatricula: number;
+    taxaConversao: number;
+  };
+  getAttendanceStatsByMonth: (schoolId: string, startMonth: string, endMonth: string) => Array<{
+    month: string;
+    totalAgendados: number;
+    compareceram: number;
+    matricularam: number;
+    naoCompareceram: number;
+    taxaComparecimento: number;
+    taxaMatricula: number;
+    taxaConversao: number;
+  }>;
+  getAttendanceStatsBySeller: (schoolId: string, sellerId: string, month?: string) => {
+    totalAgendados: number;
+    compareceram: number;
+    matricularam: number;
+    naoCompareceram: number;
+    taxaComparecimento: number;
+    taxaMatricula: number;
+    taxaConversao: number;
+  };
+  
   // Qualification Conversation functions
   createQualificationConversation: (data: Omit<QualificationConversation, 'id' | 'createdAt' | 'updatedAt'>) => Promise<QualificationConversation | null>;
   updateQualificationConversation: (id: string, data: Partial<QualificationConversation>) => Promise<boolean>;
@@ -248,6 +278,14 @@ const MOCK_SCHOOLS: School[] = [
     phone: '',
     address: '',
     createdAt: new Date()
+  },
+  {
+    id: '2',
+    name: 'Rockfeller Navegantes',
+    email: 'admin@navegantes.com.br',
+    phone: '(47) 9 9999-9999',
+    address: 'Rua das Navegantes, 123 - Navegantes/SC',
+    createdAt: new Date()
   }
 ];
 
@@ -259,6 +297,16 @@ const MOCK_SELLERS: Seller[] = [
     phone: '(11) 9 9999-9999',
     role: 'Consultor de Vendas',
     schoolId: '1',
+    active: true,
+    createdAt: new Date('2024-01-01')
+  },
+  {
+    id: 'seller_test_2',
+    name: 'Tatiana Venga',
+    email: 'tatiana.direito@hotmail.com',
+    phone: '47999931-4011',
+    role: 'Consultora de Vendas',
+    schoolId: '2',
     active: true,
     createdAt: new Date('2024-01-01')
   }
@@ -330,13 +378,25 @@ const createSedeLeadSources = (): LeadSource[] => {
   }));
 };
 
-const MOCK_LEAD_SOURCES: LeadSource[] = createSedeLeadSources();
+// Criar fontes padrão para a escola navegantes (ID = '2')
+const createNavegantesLeadSources = (): LeadSource[] => {
+  return DEFAULT_LEAD_SOURCES.map((source, index) => ({
+    ...source,
+    id: `2_${source.name.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}${index}`,
+    schoolId: '2',
+    createdAt: new Date()
+  }));
+};
+
+const MOCK_LEAD_SOURCES: LeadSource[] = [...createSedeLeadSources(), ...createNavegantesLeadSources()];
 
 // Função para obter senhas do localStorage (em produção, usar hash/criptografia)
 const getMockPasswords = (): Record<string, string> => {
   const defaultPasswords = { 
     'admin@rockfeller.com.br': 'admin123',
-    'ricardo@rockfeller.com.br': 'ricardo123'
+    'ricardo@rockfeller.com.br': 'ricardo123',
+    'admin@navegantes.com.br': 'navegantes123',
+    'tatiana.direito@hotmail.com': 'tatiana123'
   };
   try {
     const savedPasswords = localStorage.getItem('mock_passwords');
@@ -833,6 +893,98 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return appointments.filter(a => a.schoolId === schoolId);
   };
 
+  // Attendance statistics functions
+  const getAttendanceStats = (schoolId: string, month?: string) => {
+    const schoolAppointments = getAppointmentsBySchool(schoolId);
+    
+    // Filtrar por mês se especificado
+    const filteredAppointments = month 
+      ? schoolAppointments.filter(apt => {
+          const aptDate = new Date(apt.date);
+          const targetMonth = new Date(month + '-01');
+          return aptDate.getFullYear() === targetMonth.getFullYear() && 
+                 aptDate.getMonth() === targetMonth.getMonth();
+        })
+      : schoolAppointments;
+
+    const totalAgendados = filteredAppointments.length;
+    const compareceram = filteredAppointments.filter(apt => 
+      apt.status === 'compareceu' || apt.status === 'em_fechamento' || apt.status === 'matriculou'
+    ).length;
+    const matricularam = filteredAppointments.filter(apt => apt.status === 'matriculou').length;
+    const naoCompareceram = filteredAppointments.filter(apt => apt.status === 'nao_compareceu').length;
+
+    const taxaComparecimento = totalAgendados > 0 ? (compareceram / totalAgendados * 100) : 0;
+    const taxaMatricula = compareceram > 0 ? (matricularam / compareceram * 100) : 0;
+    const taxaConversao = totalAgendados > 0 ? (matricularam / totalAgendados * 100) : 0;
+
+    return {
+      totalAgendados,
+      compareceram,
+      matricularam,
+      naoCompareceram,
+      taxaComparecimento,
+      taxaMatricula,
+      taxaConversao
+    };
+  };
+
+  const getAttendanceStatsByMonth = (schoolId: string, startMonth: string, endMonth: string) => {
+    const schoolAppointments = getAppointmentsBySchool(schoolId);
+    const result = [];
+    
+    const start = new Date(startMonth + '-01');
+    const end = new Date(endMonth + '-01');
+    
+    for (let d = new Date(start); d <= end; d.setMonth(d.getMonth() + 1)) {
+      const monthStr = d.toISOString().slice(0, 7); // YYYY-MM format
+      const monthStats = getAttendanceStats(schoolId, monthStr);
+      result.push({
+        month: monthStr,
+        ...monthStats
+      });
+    }
+    
+    return result;
+  };
+
+  const getAttendanceStatsBySeller = (schoolId: string, sellerId: string, month?: string) => {
+    const schoolAppointments = getAppointmentsBySchool(schoolId);
+    
+    // Filtrar por vendedor e mês
+    const filteredAppointments = schoolAppointments.filter(apt => {
+      const matchesSeller = apt.assignedTo === sellerId;
+      if (!month) return matchesSeller;
+      
+      const aptDate = new Date(apt.date);
+      const targetMonth = new Date(month + '-01');
+      return matchesSeller && 
+             aptDate.getFullYear() === targetMonth.getFullYear() && 
+             aptDate.getMonth() === targetMonth.getMonth();
+    });
+
+    const totalAgendados = filteredAppointments.length;
+    const compareceram = filteredAppointments.filter(apt => 
+      apt.status === 'compareceu' || apt.status === 'em_fechamento' || apt.status === 'matriculou'
+    ).length;
+    const matricularam = filteredAppointments.filter(apt => apt.status === 'matriculou').length;
+    const naoCompareceram = filteredAppointments.filter(apt => apt.status === 'nao_compareceu').length;
+
+    const taxaComparecimento = totalAgendados > 0 ? (compareceram / totalAgendados * 100) : 0;
+    const taxaMatricula = compareceram > 0 ? (matricularam / compareceram * 100) : 0;
+    const taxaConversao = totalAgendados > 0 ? (matricularam / totalAgendados * 100) : 0;
+
+    return {
+      totalAgendados,
+      compareceram,
+      matricularam,
+      naoCompareceram,
+      taxaComparecimento,
+      taxaMatricula,
+      taxaConversao
+    };
+  };
+
   // Qualification Conversation functions
   const createQualificationConversation = async (data: Omit<QualificationConversation, 'id' | 'createdAt' | 'updatedAt'>): Promise<QualificationConversation | null> => {
     try {
@@ -1147,6 +1299,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     updateAppointment,
     deleteAppointment,
     getAppointmentsBySchool,
+    getAttendanceStats,
+    getAttendanceStatsByMonth,
+    getAttendanceStatsBySeller,
     createQualificationConversation,
     updateQualificationConversation,
     getQualificationConversationsBySchool,

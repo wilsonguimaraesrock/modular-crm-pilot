@@ -1,0 +1,213 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model School {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  phone     String?
+  address   String?
+  createdAt DateTime @default(now())
+
+  // Relacionamentos
+  sellers                      Seller[]
+  leadSources                  LeadSource[]
+  leads                        Lead[]
+  appointments                 Appointment[]
+  qualificationConversations   QualificationConversation[]
+  followUps                    FollowUp[]
+  tasks                        Task[]
+
+  @@map("schools")
+}
+
+model Seller {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  phone     String
+  role      String
+  schoolId  String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  // Relacionamentos
+  school                       School                      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  leads                        Lead[]
+  appointments                 Appointment[]
+  qualificationConversations   QualificationConversation[]
+  followUps                    FollowUp[]
+  tasks                        Task[]
+
+  @@map("sellers")
+}
+
+model LeadSource {
+  id           String   @id @default(cuid())
+  name         String
+  type         String   // 'form' | 'integration'
+  icon         String
+  active       Boolean  @default(false)
+  url          String?
+  description  String
+  fields       Json     // Array de strings
+  autoAssign   String?
+  notifications Boolean @default(true)
+  webhookUrl   String?
+  leadsCount   Int      @default(0)
+  schoolId     String
+  createdAt    DateTime @default(now())
+
+  // Relacionamentos
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  leads  Lead[]
+
+  @@map("lead_sources")
+}
+
+model Lead {
+  id           String    @id @default(cuid())
+  name         String
+  email        String
+  phone        String
+  company      String?
+  position     String?
+  interests    String?
+  source       String
+  method       String    // Adults, Teens, Kids, Practice & Progress, On Demand
+  modality     String    // Presencial ou Live
+  age          String?
+  experience   String?
+  availability String?
+  budget       String?
+  goals        String?
+  score        Int       @default(0)
+  status       String    @default("novo") // 'novo' | 'qualificado' | 'agendado' | 'fechado' | 'perdido'
+  schoolId     String
+  assignedTo   String?
+  sourceId     String?
+  notes        String?   @db.Text
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relacionamentos
+  school       School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  seller       Seller?       @relation(fields: [assignedTo], references: [id])
+  leadSource   LeadSource?   @relation(fields: [sourceId], references: [id])
+  appointments Appointment[]
+  followUps    FollowUp[]
+  tasks        Task[]
+
+  @@map("leads")
+}
+
+model Appointment {
+  id          String   @id @default(cuid())
+  leadId      String
+  leadName    String
+  leadPhone   String?
+  leadEmail   String?
+  date        String
+  time        String
+  type        String   // 'presencial' | 'online'
+  status      String   @default("agendado") // 'agendado' | 'confirmado' | 'realizado' | 'cancelado' | 'remarcado' | 'compareceu' | 'nao_compareceu' | 'em_fechamento' | 'matriculou' | 'nao_matriculou'
+  schoolId    String
+  assignedTo  String?
+  notes       String?  @db.Text
+  meetingLink String?
+  address     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relacionamentos
+  school School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  lead   Lead    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  seller Seller? @relation(fields: [assignedTo], references: [id])
+
+  @@map("appointments")
+}
+
+model QualificationConversation {
+  id              String   @id @default(cuid())
+  leadName        String
+  leadPhone       String?
+  leadEmail       String?
+  messages        Json     // Array de objetos {type, content, timestamp}
+  stage           Int      @default(0)
+  score           Int      @default(0)
+  stageScores     Json     // Record<string, number>
+  schoolId        String
+  assignedSeller  String?
+  status          String   @default("active") // 'active' | 'completed' | 'abandoned'
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relacionamentos
+  school School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  seller Seller? @relation(fields: [assignedSeller], references: [id])
+
+  @@map("qualification_conversations")
+}
+
+model FollowUp {
+  id            String   @id @default(cuid())
+  leadId        String
+  leadName      String
+  type          String   // 'ligacao' | 'email' | 'whatsapp' | 'visita' | 'reuniao' | 'outro'
+  priority      String   // 'alta' | 'media' | 'baixa'
+  description   String
+  scheduledDate DateTime
+  status        String   @default("pendente") // 'pendente' | 'concluido' | 'cancelado'
+  notes         String?  @db.Text
+  schoolId      String
+  assignedTo    String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relacionamentos
+  school School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  lead   Lead    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  seller Seller? @relation(fields: [assignedTo], references: [id])
+
+  @@map("follow_ups")
+}
+
+model Task {
+  id             String    @id @default(cuid())
+  title          String
+  description    String
+  type           String    // 'follow_up' | 'manual'
+  priority       String    // 'alta' | 'media' | 'baixa'
+  status         String    @default("pendente") // 'pendente' | 'concluido' | 'cancelado'
+  scheduledDate  DateTime
+  completedDate  DateTime?
+  schoolId       String
+  assignedTo     String?
+  leadId         String?
+  leadName       String?
+  category       String?
+  estimatedTime  Int?      // em minutos
+  actualTime     Int?      // em minutos
+  notes          String?   @db.Text
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relacionamentos
+  school School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  seller Seller? @relation(fields: [assignedTo], references: [id])
+  lead   Lead?   @relation(fields: [leadId], references: [id])
+
+  @@map("tasks")
+}

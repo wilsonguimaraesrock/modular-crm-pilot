@@ -38,3 +38,5 @@ secrets.json
 
 # OS generated files
 Thumbs.db
+
+/generated/prisma

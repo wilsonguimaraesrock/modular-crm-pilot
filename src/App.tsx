@@ -8,6 +8,7 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import { EmbedChat } from "./pages/EmbedChat";
+import { Webhook } from "./pages/Webhook";
 
 const queryClient = new QueryClient();
 
@@ -30,6 +31,14 @@ const App = () => (
             <Route 
               path="/embed/chat-qualificacao" 
               element={<EmbedChat />} 
+            />
+            <Route 
+              path="/webhook" 
+              element={<Webhook />} 
+            />
+            <Route 
+              path="/api/webhook/leads" 
+              element={<Webhook />} 
             />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

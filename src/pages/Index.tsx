@@ -3,6 +3,7 @@ import { DashboardOverview } from '@/components/crm/DashboardOverview';
 import { LeadCapture } from '@/components/crm/LeadCapture';
 import { LeadQualification } from '@/components/crm/LeadQualification';
 import { CalendarScheduling } from '@/components/crm/CalendarScheduling';
+import { AttendanceModule } from '@/components/crm/AttendanceModule';
 import { AgendaModule } from '@/components/crm/AgendaModule';
 import { WhatsAppIntegration } from '@/components/crm/WhatsAppIntegration';
 import { AdminPanel } from '@/components/crm/AdminPanel';
@@ -28,6 +29,8 @@ const Index = () => {
         return <LeadQualification />;
       case 'calendar':
         return <CalendarScheduling />;
+      case 'attendance':
+        return <AttendanceModule />;
       case 'agenda':
         return <AgendaModule />;
       case 'whatsapp':
@@ -52,6 +55,7 @@ const Index = () => {
       leads: 'Captura de Leads', 
       qualification: 'Qualificação IA',
       calendar: 'Agendamento',
+      attendance: 'Atendimentos',
       agenda: 'Agenda de Tarefas',
       whatsapp: 'WhatsApp',
       admin: 'Configurações'
