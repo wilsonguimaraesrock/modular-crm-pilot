@@ -9,7 +9,8 @@ import {
   Building,
   User,
   CalendarDays,
-  UserCheck
+  UserCheck,
+  FileSpreadsheet
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -34,6 +35,7 @@ export const Navigation = ({ activeModule, setActiveModule, isMobile = false }: 
     { id: 'calendar', name: 'Agendamento', icon: Calendar, notifications: 0, allowedTypes: ['school', 'seller'] },
     { id: 'attendance', name: 'Atendimentos', icon: UserCheck, notifications: 0, allowedTypes: ['school', 'seller'] },
     { id: 'agenda', name: 'Agenda de Tarefas', icon: CalendarDays, notifications: 0, allowedTypes: ['school', 'seller'] },
+    { id: 'contacts', name: 'Contatos', icon: FileSpreadsheet, notifications: 0, allowedTypes: ['school'] },
     { id: 'whatsapp', name: 'WhatsApp', icon: Send, notifications: 0, allowedTypes: ['school'] },
     { id: 'admin', name: 'Configurações', icon: Settings, notifications: 0, allowedTypes: ['school'] },
   ];

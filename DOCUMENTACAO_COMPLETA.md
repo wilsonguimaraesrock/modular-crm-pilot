@@ -27,9 +27,9 @@ O CRM Rockfeller possui um sistema completo de integração com landing pages ex
 
 ##### **A) URL Parameters (Recomendado)**
 ```javascript
-// URL gerada: http://localhost:8080/webhook?leadData=encodedJSON
-const crmUrl = `http://localhost:8080/webhook?leadData=${encodedData}`;
-window.open(crmUrl, '_blank');
+        // URL gerada: http://localhost:3001/webhook?leadData=encodedJSON
+        const crmUrl = `http://localhost:3001/webhook?leadData=${encodedData}`;
+        window.open(crmUrl, '_blank');
 ```
 
 **Vantagens:**
@@ -224,7 +224,7 @@ window.enviarParaCRM = function(leadData) {
         const encodedData = encodeURIComponent(JSON.stringify(leadData));
         
         // URL do CRM local com dados como parâmetros
-        const crmUrl = `http://localhost:8080/webhook?leadData=${encodedData}`;
+        const crmUrl = `http://localhost:3001/webhook?leadData=${encodedData}`;
         
         console.log('🌐 Abrindo CRM com URL:', crmUrl);
         

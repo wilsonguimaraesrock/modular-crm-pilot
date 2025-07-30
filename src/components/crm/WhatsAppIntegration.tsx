@@ -38,12 +38,14 @@ import {
   FileText,
   Volume2,
   Play,
-  Search
+  Search,
+  Pause
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useDatabaseAuth } from '@/contexts/DatabaseAuthContext';
 import { motion } from 'framer-motion';
+import React from 'react'; // Added missing import for React
 
 // Interfaces
 interface WAHASession {
@@ -88,34 +90,28 @@ export const WhatsAppIntegration = () => {
   const messagesRefreshRef = useRef<NodeJS.Timeout | null>(null);
 
   // Estados principais
-  const [activeTab, setActiveTab] = useState('connection');
+  const [activeTab, setActiveTab] = useState('conversations');
   const [wahaConfig, setWahaConfig] = useState({
-    url: 'http://localhost:3000',
-    apiKey: '',
-    session: 'default',
-    chatgptKey: ''
+    url: '/api/whatsapp', // Usar proxy do Next.js
+    apiKey: process.env.NEXT_PUBLIC_WAHA_API_KEY || 'waha-key-2025',
+    session: process.env.NEXT_PUBLIC_WAHA_SESSION || 'default',
+    chatgptKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY || ''
   });
-  
-  // Estados da conexão WhatsApp
   const [sessionStatus, setSessionStatus] = useState<WAHASession | null>(null);
   const [qrCode, setQrCode] = useState<string | null>(null);
-  const [isConnecting, setIsConnecting] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
-  
-  // Estados das conversas
-  const [messages, setMessages] = useState<WAHAMessage[]>([]);
-  const [contacts, setContacts] = useState<any[]>([]);
+  const [isConnecting, setIsConnecting] = useState(false);
   const [chats, setChats] = useState<any[]>([]);
+  const [contacts, setContacts] = useState<any[]>([]);
   const [selectedChat, setSelectedChat] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
-  
-  // Estado para cache das fotos de perfil
-  const [profilePictures, setProfilePictures] = useState<{[key: string]: string}>({});
-  
-  // Ref para scroll automático
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [hideGroups, setHideGroups] = useState(false);
+  const [profilePictures, setProfilePictures] = useState<Record<string, string>>({});
+  const [isUserScrolling, setIsUserScrolling] = useState(false);
+  const [lastScrollTop, setLastScrollTop] = useState(0);
   
   // Estados da IA automática
   const [aiConversations, setAiConversations] = useState<AIConversation[]>([]);
@@ -130,13 +126,62 @@ export const WhatsAppIntegration = () => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [message, setMessage] = useState('');
   
-  // Estado para filtro de grupos
-  const [hideGroups, setHideGroups] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-
+  // Ref para scroll automático
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  
   // Carregar dados
   const schoolLeads = user ? getLeadsBySchool(user.schoolId) : [];
   const sellers = user ? getSellersBySchool(user.schoolId) : [];
+
+  // Sistema de gerenciamento de áudio global simplificado
+  const audioManagerRef = useRef<{
+    currentAudio: HTMLAudioElement | null;
+    currentUrl: string | null;
+    isPlaying: boolean;
+  }>({
+    currentAudio: null,
+    currentUrl: null,
+    isPlaying: false
+  });
+
+  // Cache para URLs processadas para evitar recálculos
+  const urlCacheRef = useRef<Map<string, string>>(new Map());
+
+  // Sistema de áudio simplificado - funções removidas para evitar conflitos
+
+  // Função para processar URL de mídia (com cache)
+  const processMediaUrl = (originalUrl: string, wahaUrl: string): string => {
+    // Verificar cache primeiro
+    const cacheKey = `${originalUrl}_${wahaUrl}`;
+    if (urlCacheRef.current.has(cacheKey)) {
+      return urlCacheRef.current.get(cacheKey)!;
+    }
+
+    if (!originalUrl) return '';
+
+    let finalUrl = originalUrl;
+    
+    // Se ainda tem /api/files/ mas não é URL absoluta, corrigir
+    if (finalUrl.includes('/api/files/') && !finalUrl.startsWith('http')) {
+      // Converter /api/files/default/filename para URL direta do WAHA
+      const filename = finalUrl.split('/api/files/')[1];
+      finalUrl = `${wahaUrl.replace(/\/$/, '')}/api/files/${filename}`;
+    } else if (!finalUrl.startsWith('http')) {
+      // Se não for URL absoluta, adicionar base do WAHA
+      finalUrl = `${wahaUrl.replace(/\/$/, '')}${finalUrl.startsWith('/') ? '' : '/'}${finalUrl}`;
+    }
+    
+    // Armazenar no cache
+    urlCacheRef.current.set(cacheKey, finalUrl);
+    
+    console.log(`[MediaURL] URL original: ${originalUrl} -> URL final: ${finalUrl}`);
+    
+    return finalUrl;
+  };
+
+  // Sistema de áudio simplificado - verificação de arquivo removida para evitar latência
+
+  // Sistema de áudio simplificado - removido funções que causavam conflito
 
   // Verificar se há lead direcionado do dashboard
   useEffect(() => {
@@ -183,20 +228,27 @@ Posso te ajudar a escolher o curso ideal para seu perfil! 😊`;
   // Carregar configurações salvas
   useEffect(() => {
     if (user) {
-      const savedConfig = localStorage.getItem(`whatsapp_config_${user.schoolId}`);
-      if (savedConfig) {
-        const config = JSON.parse(savedConfig);
-        setWahaConfig(config);
-        // Verificar status da sessão automaticamente
-        checkSessionStatus(config);
-        // Iniciar monitoramento se a configuração existir
-        setTimeout(() => startStatusMonitoring(), 1000);
-      } else {
-        // Mesmo sem configuração salva, verificar se existe sessão default
-        checkSessionStatus();
-        // Iniciar monitoramento mesmo sem configuração salva
-        setTimeout(() => startStatusMonitoring(), 1000);
-      }
+      // LIMPAR TODAS as configurações antigas do localStorage
+      localStorage.removeItem(`whatsapp_config_${user.schoolId}`);
+      localStorage.removeItem(`whatsapp_config_${user.schoolId}_backup`);
+      localStorage.removeItem(`whatsapp_config`);
+      localStorage.removeItem(`waha_config`);
+      
+      // Forçar uso das variáveis de ambiente
+      const newConfig = {
+        url: '/api/whatsapp', // Usar proxy do Next.js
+        apiKey: process.env.NEXT_PUBLIC_WAHA_API_KEY || 'waha-key-2025',
+        session: process.env.NEXT_PUBLIC_WAHA_SESSION || 'default',
+        chatgptKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY || ''
+      };
+      
+      console.log('🔧 Configuração WAHA carregada:', newConfig);
+      setWahaConfig(newConfig);
+      
+      // Verificar status da sessão automaticamente
+      checkSessionStatus(newConfig);
+      // Iniciar monitoramento
+      setTimeout(() => startStatusMonitoring(), 1000);
 
       const savedConversations = localStorage.getItem(`ai_conversations_${user.schoolId}`);
       if (savedConversations) {
@@ -219,26 +271,26 @@ Posso te ajudar a escolher o curso ideal para seu perfil! 😊`;
     }
   }, [sessionStatus?.status]);
 
-  // Auto-refresh das mensagens quando uma conversa está selecionada
+  // Auto-refresh das mensagens quando uma conversa está selecionada (DESABILITADO)
   useEffect(() => {
     if (selectedChat && sessionStatus?.status === 'WORKING') {
-      // Iniciar auto-refresh a cada 5 segundos
-      const startMessagesRefresh = () => {
-        if (messagesRefreshRef.current) clearInterval(messagesRefreshRef.current);
-        messagesRefreshRef.current = setInterval(() => {
-          console.log('[Auto-refresh] Atualizando mensagens...');
-          loadChatMessages(selectedChat);
-        }, 5000);
-      };
+      // DESABILITADO: Auto-refresh estava causando re-renderização das imagens
+      // const startMessagesRefresh = () => {
+      //   if (messagesRefreshRef.current) clearInterval(messagesRefreshRef.current);
+      //   messagesRefreshRef.current = setInterval(() => {
+      //     console.log('[Auto-refresh] Atualizando mensagens...');
+      //     loadChatMessages(selectedChat);
+      //   }, 5000);
+      // };
       
-      startMessagesRefresh();
+      // startMessagesRefresh();
       
-      return () => {
-        if (messagesRefreshRef.current) {
-          clearInterval(messagesRefreshRef.current);
-          messagesRefreshRef.current = null;
-        }
-      };
+      // return () => {
+      //   if (messagesRefreshRef.current) {
+      //     clearInterval(messagesRefreshRef.current);
+      //     messagesRefreshRef.current = null;
+      //   }
+      // };
     }
   }, [selectedChat, sessionStatus?.status]);
 
@@ -257,7 +309,7 @@ Posso te ajudar a escolher o curso ideal para seu perfil! 😊`;
       const response = await fetch(`${wahaConfig.url}${endpoint}`, {
         headers: {
           'Content-Type': 'application/json',
-          ...(wahaConfig.apiKey && { 'Authorization': `Bearer ${wahaConfig.apiKey}` }),
+          ...(wahaConfig.apiKey && { 'X-API-Key': wahaConfig.apiKey }),
           ...options.headers,
         },
         ...options,
@@ -274,58 +326,119 @@ Posso te ajudar a escolher o curso ideal para seu perfil! 😊`;
     }
   };
 
-  // Verificar status da sessão
+  // Verificar status da sessão com detecção melhorada e recuperação automática
   const checkSessionStatus = async (config = wahaConfig) => {
     try {
-      const response = await makeWAHARequest(`/api/sessions/${config.session}`);
+      console.log('🔍 Verificando status da sessão...', `${config.url}/sessions/${config.session}`);
+      const response = await makeWAHARequest(`/sessions/${config.session}`);
+      console.log('📊 Status da sessão:', response);
       const previousStatus = sessionStatus?.status;
+      const currentTime = new Date().toLocaleTimeString();
+      
       setSessionStatus(response);
       setConnectionError(null);
       
-      // Se mudou de SCAN_QR_CODE para WORKING, mostrar notificação
-      if (previousStatus === 'SCAN_QR_CODE' && response.status === 'WORKING') {
-        toast({
-          title: "✅ Conectado!",
-          description: `WhatsApp conectado como ${response.me?.pushName || 'usuário'}`,
-        });
+      // Detecção melhorada de mudanças de status
+      if (previousStatus !== response.status) {
+        console.log(`🔄 [${currentTime}] Status mudou de "${previousStatus}" para "${response.status}"`);
+        
+        // Conectado com sucesso
+        if (response.status === 'WORKING') {
+          const userName = response.me?.pushName || response.me?.user || 'usuário';
+          console.log(`✅ [${currentTime}] WhatsApp conectado como: ${userName}`);
+          toast({
+            title: "✅ WhatsApp Conectado!",
+            description: `Conectado como ${userName}`,
+            duration: 5000,
+          });
+          stopQRCodePolling();
+          loadChats();
+          loadContacts();
+          
+          // Ajustar intervalo de monitoramento para conectado
+          startStatusMonitoring();
+          return;
+        }
+        
+        // Autenticado mas ainda não pronto
+        if (response.status === 'AUTHENTICATED' || response.status === 'READY') {
+          console.log(`🔄 [${currentTime}] Sessão autenticada, aguardando finalização...`);
+          // Acelerar o monitoramento durante a transição
+          setTimeout(() => checkSessionStatus(config), 1000);
+          return;
+        }
+        
+        // Desconectado ou erro
+        if (previousStatus === 'WORKING' && ['SCAN_QR_CODE', 'STOPPED', 'FAILED'].includes(response.status)) {
+          console.log(`⚠️ [${currentTime}] Conexão perdida! Tentando reconectar...`);
+          toast({
+            title: "⚠️ WhatsApp Desconectado",
+            description: "Conexão perdida. Tentando reconectar automaticamente...",
+            variant: "destructive",
+          });
+          
+          // Tentar reconectar automaticamente após 3 segundos
+          setTimeout(() => {
+            console.log(`🔄 [${currentTime}] Iniciando reconexão automática...`);
+            startWhatsAppSession();
+          }, 3000);
+        }
+        
+        // Mudou para aguardar QR Code
+        if (response.status === 'SCAN_QR_CODE') {
+          console.log(`📱 [${currentTime}] Novo QR Code disponível`);
+          if (previousStatus && previousStatus !== 'SCAN_QR_CODE') {
+            toast({
+              title: "📱 Novo QR Code",
+              description: "Escaneie o QR Code para conectar",
+              duration: 3000,
+            });
+          }
+        }
+        
+        // Ajustar intervalo de monitoramento baseado no status
+        startStatusMonitoring();
       }
       
       // Se estiver esperando QR Code, começar a buscar
       if (response.status === 'SCAN_QR_CODE') {
         startQRCodePolling();
-      } else {
+      } else if (response.status !== 'WORKING') {
         stopQRCodePolling();
       }
       
-      // Se estiver conectado, buscar mensagens e contatos
-      if (response.status === 'WORKING') {
-        loadChats();
-        loadContacts();
-      }
-      
     } catch (error) {
+      console.error('❌ Erro ao verificar status:', error);
       setConnectionError(error instanceof Error ? error.message : 'Erro ao verificar status');
       setSessionStatus(null);
+      
+      // Tentar novamente em caso de erro
+      setTimeout(() => checkSessionStatus(config), 5000);
     }
   };
 
   // Iniciar monitoramento do QR Code
   const startQRCodePolling = () => {
+    console.log('🚀 Iniciando polling do QR Code...');
     if (qrIntervalRef.current) clearInterval(qrIntervalRef.current);
     
     const fetchQRCode = async () => {
       try {
-        // Endpoint correto do WAHA: /api/{session}/auth/qr
-        const response = await fetch(`${wahaConfig.url}/api/${wahaConfig.session}/auth/qr`, {
+            console.log('📲 Buscando QR Code...', `${wahaConfig.url}/${wahaConfig.session}/auth/qr`);
+    // Endpoint correto via proxy: /{session}/auth/qr
+    const response = await fetch(`${wahaConfig.url}/${wahaConfig.session}/auth/qr`, {
           headers: {
             'Accept': 'image/png',
-            ...(wahaConfig.apiKey && { 'Authorization': `Bearer ${wahaConfig.apiKey}` }),
+            ...(wahaConfig.apiKey && { 'X-API-Key': wahaConfig.apiKey }),
           },
         });
+        
+        console.log('📲 Resposta QR Code:', response.status, response.statusText);
         
         if (response.ok) {
           const blob = await response.blob();
           const qrUrl = URL.createObjectURL(blob);
+          console.log('✅ QR Code obtido com sucesso, blob size:', blob.size);
           setQrCode(qrUrl);
         } else if (response.status === 400) {
           // Sessão já está conectada, não precisa de QR Code
@@ -371,7 +484,7 @@ Posso te ajudar a escolher o curso ideal para seu perfil! 😊`;
       // Primeiro verificar se a sessão já existe e seu status
       let currentSession = null;
       try {
-        currentSession = await makeWAHARequest(`/api/sessions/${wahaConfig.session}`);
+        currentSession = await makeWAHARequest(`/sessions/${wahaConfig.session}`);
       } catch (error) {
         // Sessão não existe, vamos criar
         currentSession = null;
@@ -388,24 +501,52 @@ Posso te ajudar a escolher o curso ideal para seu perfil! 😊`;
         return;
       }
 
-      // Se não existir, criar a sessão
-      if (!currentSession) {
-        await makeWAHARequest(`/api/sessions`, {
-          method: 'POST',
-          body: JSON.stringify({
-            name: wahaConfig.session,
-            config: {
-              webhooks: []
-            }
-          }),
+      // Se a sessão já está aguardando QR, começar polling
+      if (currentSession && currentSession.status === 'SCAN_QR_CODE') {
+        setSessionStatus(currentSession);
+        startStatusMonitoring();
+        startQRCodePolling();
+        toast({
+          title: "Aguardando QR Code",
+          description: "Escaneie o QR Code para conectar o WhatsApp",
         });
+        return;
       }
 
-      // Iniciar a sessão apenas se não estiver funcionando
-      if (!currentSession || currentSession.status !== 'WORKING') {
-        await makeWAHARequest(`/api/sessions/${wahaConfig.session}/start`, {
-          method: 'POST',
-        });
+      // Se não existir, criar a sessão
+      if (!currentSession) {
+        try {
+          await makeWAHARequest(`/sessions`, {
+            method: 'POST',
+            body: JSON.stringify({
+              name: wahaConfig.session,
+              config: {
+                webhooks: []
+              }
+            }),
+          });
+        } catch (error) {
+          // Ignorar se sessão já existe
+          if (!error.message.includes('already exists')) {
+            throw error;
+          }
+        }
+      }
+
+      // Iniciar a sessão apenas se estiver parada
+      if (!currentSession || currentSession.status === 'STOPPED' || currentSession.status === 'FAILED') {
+        try {
+          await makeWAHARequest(`/sessions/${wahaConfig.session}/start`, {
+            method: 'POST',
+          });
+        } catch (error) {
+          // Se retornar 422 "already started", ignorar e continuar
+          if (error.message.includes('422') && error.message.includes('already started')) {
+            console.log('Sessão já estava iniciada, continuando...');
+          } else {
+            throw error;
+          }
+        }
       }
 
       // Começar monitoramento
@@ -431,7 +572,7 @@ Posso te ajudar a escolher o curso ideal para seu perfil! 😊`;
   // Parar sessão WhatsApp
   const stopWhatsAppSession = async () => {
     try {
-      await makeWAHARequest(`/api/sessions/${wahaConfig.session}/stop`, {
+      await makeWAHARequest(`/sessions/${wahaConfig.session}/stop`, {
         method: 'POST',
       });
       
@@ -457,12 +598,32 @@ Posso te ajudar a escolher o curso ideal para seu perfil! 😊`;
   const startStatusMonitoring = () => {
     if (statusIntervalRef.current) clearInterval(statusIntervalRef.current);
     
-    // Intervalo mais rápido se estiver esperando QR Code
-    const interval = sessionStatus?.status === 'SCAN_QR_CODE' ? 2000 : 5000;
+    // Intervalo mais agressivo para detectar mudanças rapidamente
+    const currentStatus = sessionStatus?.status;
+    // 500ms durante QR Code para detecção ultra-rápida, 2s para estados intermediários, 15s quando conectado
+    const interval = currentStatus === 'SCAN_QR_CODE' ? 500 : 
+                    currentStatus === 'WORKING' ? 15000 : 
+                    ['STARTING', 'AUTHENTICATED', 'READY'].includes(currentStatus) ? 800 : 2000;
+    
+    console.log(`⏰ Iniciando monitoramento de status: ${interval}ms (status: ${currentStatus})`);
     
     statusIntervalRef.current = setInterval(() => {
       checkSessionStatus();
-    }, interval); // 2s durante QR Code, 5s normalmente
+    }, interval);
+    
+    // Durante QR Code, fazer verificação adicional a cada 2 segundos para mudanças rápidas
+    if (currentStatus === 'SCAN_QR_CODE') {
+      const rapidCheckRef = setInterval(() => {
+        if (sessionStatus?.status !== 'SCAN_QR_CODE') {
+          clearInterval(rapidCheckRef);
+          return;
+        }
+        checkSessionStatus();
+      }, 2000);
+      
+      // Limpar verificação rápida após 2 minutos
+      setTimeout(() => clearInterval(rapidCheckRef), 120000);
+    }
   };
 
   const stopStatusMonitoring = () => {
@@ -475,47 +636,21 @@ Posso te ajudar a escolher o curso ideal para seu perfil! 😊`;
   // Carregar conversas/chats
   const loadChats = async () => {
     try {
-      console.log('[loadChats] Carregando conversas...');
+      console.log(`[loadChats] Carregando conversas...`);
+      console.log(`[loadChats] URL da requisição: ${wahaConfig.url}/${wahaConfig.session}/chats`);
       
-      // Usar endpoint /chats/overview que é mais otimizado
-      const response = await makeWAHARequest(`/api/${wahaConfig.session}/chats/overview?limit=100`);
+      const response = await makeWAHARequest(`/${wahaConfig.session}/chats`);
+      console.log(`[loadChats] Resposta recebida:`, response);
       
-      console.log('[loadChats] Conversas recebidas:', response?.length || 0);
-      
-      // Transformar para o formato esperado e ordenar
-      const chatsData = (response || []).map(chat => ({
-        id: {
-          _serialized: chat.id
-        },
-        name: chat.name || chat.id.split('@')[0],
-        isGroup: chat.id.includes('@g.us'),
-        unreadCount: chat._chat?.unreadCount || 0,
-        timestamp: chat.lastMessage?.timestamp || 0,
-        lastMessage: chat.lastMessage
-      }));
-      
-      // Ordenar chats: não lidos primeiro, depois por timestamp
-      const sortedChats = chatsData.sort((a, b) => {
-        // Primeiro, ordenar por mensagens não lidas
-        if (a.unreadCount > 0 && b.unreadCount === 0) return -1;
-        if (a.unreadCount === 0 && b.unreadCount > 0) return 1;
-        // Se ambos têm ou não têm mensagens não lidas, ordenar por timestamp
-        return (b.timestamp || 0) - (a.timestamp || 0);
-      });
-      
-      setChats(sortedChats);
-      console.log('[loadChats] Conversas processadas:', sortedChats.length);
-      
-      // Log das conversas com mensagens não lidas
-      const unreadChats = sortedChats.filter(chat => chat.unreadCount > 0);
-      if (unreadChats.length > 0) {
-        console.log('[loadChats] Conversas com mensagens não lidas:', unreadChats.map(c => ({
-          name: c.name,
-          unreadCount: c.unreadCount
-        })));
+      if (Array.isArray(response)) {
+        console.log(`[loadChats] ${response.length} conversas carregadas`);
+        setChats(response);
+      } else {
+        console.error(`[loadChats] Resposta não é um array:`, response);
+        setChats([]);
       }
     } catch (error) {
-      console.error('Erro ao carregar conversas:', error);
+      console.error('[loadChats] Erro ao carregar conversas:', error);
       setChats([]);
     }
   };
@@ -523,8 +658,32 @@ Posso te ajudar a escolher o curso ideal para seu perfil! 😊`;
   // Carregar contatos
   const loadContacts = async () => {
     try {
-      const response = await makeWAHARequest(`/api/${wahaConfig.session}/contacts`);
-      setContacts(response || []);
+      // O WAHA não tem endpoint específico para contatos, mas podemos extrair dos chats
+      // Vamos usar os chats para obter informações dos contatos
+      const chatsResponse = await makeWAHARequest(`/${wahaConfig.session}/chats`);
+      
+      if (chatsResponse && Array.isArray(chatsResponse)) {
+        // Extrair contatos individuais dos chats (excluir grupos)
+        const individualContacts = chatsResponse
+          .filter(chat => !chat.isGroup)
+          .map(chat => {
+            // Verificar se chat.id é um objeto ou string
+            const chatId = typeof chat.id === 'object' ? chat.id._serialized : chat.id;
+            const chatName = chat.name || (chatId ? chatId.split('@')[0] : 'Desconhecido');
+            
+            return {
+              id: chatId,
+              name: chatName,
+              number: chatId ? chatId.split('@')[0] : '',
+              isGroup: false
+            };
+          });
+        
+        setContacts(individualContacts);
+        console.log(`[loadContacts] ${individualContacts.length} contatos carregados`);
+      } else {
+        setContacts([]);
+      }
     } catch (error) {
       console.error('Erro ao carregar contatos:', error);
       setContacts([]);
@@ -533,101 +692,109 @@ Posso te ajudar a escolher o curso ideal para seu perfil! 😊`;
 
   // Obter foto de perfil de um contato
   const getContactProfilePicture = async (contactId: string): Promise<string | null> => {
-    try {
-      // Verificar se já temos em cache
-      if (profilePictures[contactId]) {
-        return profilePictures[contactId];
-      }
-
-      console.log(`[getContactProfilePicture] Buscando foto para: ${contactId}`);
-      
-      const response = await makeWAHARequest(
-        `/api/contacts/profile-picture?session=${wahaConfig.session}&contactId=${contactId}`
-      );
-      
-      if (response?.profilePictureURL) {
-        // Armazenar no cache
-        setProfilePictures(prev => ({
-          ...prev,
-          [contactId]: response.profilePictureURL
-        }));
-        
-        console.log(`[getContactProfilePicture] Foto encontrada para ${contactId}: ${response.profilePictureURL}`);
-        return response.profilePictureURL;
-      }
-      
-      return null;
-    } catch (error) {
-      console.error(`Erro ao obter foto de perfil para ${contactId}:`, error);
-      return null;
-    }
+    // WAHA não suporta API de foto de perfil, retornar null
+    console.log(`[getContactProfilePicture] API de foto de perfil não suportada pelo WAHA para: ${contactId}`);
+    return null;
   };
 
   // Carregar mensagens de um chat específico
   const loadChatMessages = async (chatId: string) => {
     try {
       console.log(`[loadChatMessages] Carregando mensagens para chat: ${chatId}`);
+      console.log(`[loadChatMessages] URL da requisição: ${wahaConfig.url}/${wahaConfig.session}/chats/${chatId}/messages?limit=100&downloadMedia=true`);
       
-      // Calcular timestamp das últimas 24 horas para buscar mensagens recentes
-      const now = Math.floor(Date.now() / 1000);
-      const twentyFourHoursAgo = now - (24 * 60 * 60);
+      const response = await makeWAHARequest(`/${wahaConfig.session}/chats/${chatId}/messages?limit=100&downloadMedia=true`);
+      console.log(`[loadChatMessages] Resposta recebida:`, response);
       
-      // Usar filtros de timestamp para buscar mensagens recentes primeiro
-      // downloadMedia=true para obter URLs de mídia (áudio, imagem, etc.)
-      const recentMessagesUrl = `/api/${wahaConfig.session}/chats/${chatId}/messages?limit=100&filter.timestamp.gte=${twentyFourHoursAgo}&downloadMedia=true`;
-      console.log(`[loadChatMessages] Buscando mensagens recentes (últimas 24h): ${recentMessagesUrl}`);
-      
-      let response = await makeWAHARequest(recentMessagesUrl);
-      
-      // Se não houver mensagens recentes, buscar as últimas 50 mensagens sem filtro
-      if (!response || response.length === 0) {
-        console.log(`[loadChatMessages] Nenhuma mensagem recente encontrada, buscando últimas 50 mensagens`);
-        response = await makeWAHARequest(`/api/${wahaConfig.session}/chats/${chatId}/messages?limit=50&downloadMedia=true`);
-      }
-      
-      // Ordenar mensagens por timestamp (mais recentes primeiro, depois reverter para ordem cronológica)
       const sortedMessages = (response || []).sort((a, b) => a.timestamp - b.timestamp);
+      console.log(`[loadChatMessages] Mensagens ordenadas:`, sortedMessages.length, 'mensagens');
       
-      console.log(`[loadChatMessages] ${sortedMessages.length} mensagens carregadas para ${chatId}`);
       setChatMessages(sortedMessages);
-      
-      // Auto-scroll para a última mensagem
-      setTimeout(() => scrollToBottom(), 100);
+      // Reset do estado de scroll ao carregar novas mensagens
+      setIsUserScrolling(false);
+      setLastScrollTop(0);
+      // Scroll para a última mensagem quando abrir conversa (como WhatsApp)
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
     } catch (error) {
-      console.error('Erro ao carregar mensagens do chat:', error);
+      console.error('[loadChatMessages] Erro ao carregar mensagens do chat:', error);
       setChatMessages([]);
     }
   };
 
-  // Scroll automático para a última mensagem
+  // Scroll automático para a última mensagem (HABILITADO apenas quando abrir conversa)
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!isUserScrolling) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   };
+
+  // Função para detectar scroll manual do usuário (menos agressiva)
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    const scrollTop = target.scrollTop;
+    const scrollHeight = target.scrollHeight;
+    const clientHeight = target.clientHeight;
+    
+    // Só marcar como scroll manual se o usuário estiver bem longe do final
+    const isNearBottom = scrollTop + clientHeight >= scrollHeight - 50;
+    
+    if (isNearBottom) {
+      // Se está perto do final, permitir scroll automático
+      setIsUserScrolling(false);
+    } else if (scrollTop < lastScrollTop && scrollTop > 100) {
+      // Se está scrollando para cima e não está no topo, marcar como scroll manual
+      setIsUserScrolling(true);
+    }
+    
+    setLastScrollTop(scrollTop);
+  };
+
+  // Reset do estado de scroll quando trocar de chat
+  useEffect(() => {
+    setIsUserScrolling(false);
+    setLastScrollTop(0);
+  }, [selectedChat]);
 
   // Enviar mensagem no chat atual
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedChat || isSending) return;
 
     setIsSending(true);
+    const messageText = newMessage.trim();
+    setNewMessage('');
+    
     try {
-      await makeWAHARequest(`/api/sendText`, {
+      const response = await makeWAHARequest(`/sendText`, {
         method: 'POST',
         body: JSON.stringify({
           session: wahaConfig.session,
           chatId: selectedChat,
-          text: newMessage.trim()
+          text: messageText
         }),
       });
 
-      setNewMessage('');
-      // Recarregar mensagens imediatamente após enviar
-      loadChatMessages(selectedChat);
+      // Adicionar a mensagem enviada ao estado local em vez de recarregar tudo
+      const newMessageObj = {
+        id: `temp_${Date.now()}`,
+        body: messageText,
+        from: 'me',
+        to: selectedChat,
+        timestamp: Date.now(),
+        fromMe: true,
+        type: 'text'
+      };
+      
+      setChatMessages(prev => [...prev, newMessageObj]);
       
       toast({
         title: "Enviado!",
         description: "Mensagem enviada com sucesso",
       });
     } catch (error) {
+      // Se falhou, restaurar a mensagem no input
+      setNewMessage(messageText);
       toast({
         title: "Erro",
         description: error instanceof Error ? error.message : 'Erro ao enviar mensagem',
@@ -643,7 +810,7 @@ Posso te ajudar a escolher o curso ideal para seu perfil! 😊`;
     try {
       const chatId = phone.includes('@') ? phone : `${phone.replace(/\D/g, '')}@c.us`;
       
-      const response = await makeWAHARequest('/api/sendText', {
+      const response = await makeWAHARequest('/sendText', {
         method: 'POST',
         body: JSON.stringify({
           session: wahaConfig.session,
@@ -790,7 +957,7 @@ Posso te ajudar a escolher o curso ideal para seu perfil! 😊`;
       );
 
       // Depois fazer a chamada para a API usando o endpoint correto
-      const response = await makeWAHARequest(`/api/${wahaConfig.session}/chats/${chatId}/messages/read`, {
+      const response = await makeWAHARequest(`/${wahaConfig.session}/chats/${chatId}/messages/read`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -883,215 +1050,352 @@ Posso te ajudar a escolher o curso ideal para seu perfil! 😊`;
     show: { opacity: 1, y: 0 }
   };
 
-  // Renderizar conteúdo de mídia
-  const renderMediaContent = (media: any) => {
-    if (!media?.mimetype || !media?.url) {
+  // Componente para renderizar mídia com fallback de erro (VERSÃO OTIMIZADA)
+  const MediaWithFallback = React.memo(({ media, wahaUrl }: { media: any, wahaUrl: string }) => {
+    const [errored, setErrored] = React.useState(false);
+    
+    // Usar a função de processamento de URL com cache
+    const url = React.useMemo(() => {
+      if (!media || !media.url) return null;
+      return processMediaUrl(media.url, wahaUrl);
+    }, [media?.url, wahaUrl]);
+    
+    // Gerar uma chave única estável para o componente baseada no ID da mensagem
+    const componentKey = React.useMemo(() => {
+      if (!media || !media.url) return null;
+      // Usar uma combinação mais estável para evitar re-renderizações
+      return `media_${media.url.split('/').pop()}_${media.mimetype}`;
+    }, [media?.url, media?.mimetype]);
+    
+    // Memoizar o componente de áudio para evitar re-renderizações
+    const audioComponent = React.useMemo(() => {
+      if (media.mimetype?.startsWith('audio') && url && componentKey) {
+        return <AudioPlayer key={componentKey} url={url} componentKey={componentKey} onError={() => setErrored(true)} />;
+      }
+      return null;
+    }, [url, media.mimetype, componentKey]);
+    
+    if (!url) return null;
+    
+    if (errored) {
       return (
-        <div className="flex items-center space-x-2 text-slate-400">
-          <FileText className="w-4 h-4" />
-          <span className="text-xs">Mídia não disponível</span>
+        <div className="text-xs text-red-400">
+          Não foi possível carregar a mídia. <a href={url} target="_blank" rel="noopener noreferrer" className="underline">Abrir em nova aba</a>
         </div>
       );
     }
-
-    const isAudio = media.mimetype.startsWith('audio/');
-    const isImage = media.mimetype.startsWith('image/');
-    const isVideo = media.mimetype.startsWith('video/');
-    const isDocument = media.mimetype.includes('pdf') || 
-                      media.mimetype.includes('document') || 
-                      media.mimetype.includes('text/');
-
-    if (isAudio) {
+    
+    if (media.mimetype?.startsWith('image')) {
       return (
-        <div className="space-y-2">
-          <div className="flex items-center space-x-2 text-slate-300">
-            <Volume2 className="w-4 h-4" />
-            <span className="text-xs font-medium">Mensagem de Áudio</span>
-          </div>
-          <audio 
-            controls 
-            className="w-full max-w-xs"
-            style={{ height: '32px' }}
-            preload="metadata"
-          >
-            <source src={media.url} type={media.mimetype} />
-            <span className="text-xs text-slate-400">
-              Seu navegador não suporta o elemento de áudio.
-            </span>
-          </audio>
-          {media.filename && (
-            <div className="text-xs text-slate-400 truncate">
-              {media.filename}
-            </div>
-          )}
-        </div>
+        <img 
+          src={url} 
+          alt="imagem" 
+          className="max-w-xs max-h-60 rounded" 
+          onError={() => setErrored(true)}
+          loading="lazy"
+        />
       );
     }
-
-    if (isImage) {
+    
+    if (media.mimetype?.startsWith('audio')) {
+      return audioComponent;
+    }
+    
+    if (media.mimetype?.startsWith('video')) {
       return (
-        <div className="space-y-2">
-          <div className="flex items-center space-x-2 text-slate-300">
-            <ImageIcon className="w-4 h-4" />
-            <span className="text-xs font-medium">Imagem</span>
-          </div>
-          <img 
-            src={media.url} 
-            alt="Imagem compartilhada"
-            className="max-w-xs rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
-            onClick={() => window.open(media.url, '_blank')}
-            onError={(e) => {
-              const target = e.currentTarget as HTMLImageElement;
-              const nextDiv = target.nextElementSibling as HTMLDivElement | null;
-              target.style.display = 'none';
-              if (nextDiv) {
-                (nextDiv as HTMLDivElement).style.display = 'block';
-              }
-            }}
-          />
-          <div style={{ display: 'none' }} className="text-xs text-slate-400">
-            Erro ao carregar imagem. <a href={media.url} target="_blank" rel="noopener noreferrer" className="underline">Abrir link</a>
-          </div>
-        </div>
+        <video 
+          controls 
+          src={url} 
+          onError={() => setErrored(true)} 
+          className="max-w-xs max-h-60"
+          preload="metadata"
+        />
       );
     }
-
-    if (isVideo) {
-      return (
-        <div className="space-y-2">
-          <div className="flex items-center space-x-2 text-slate-300">
-            <Play className="w-4 h-4" />
-            <span className="text-xs font-medium">Vídeo</span>
-          </div>
-          <video 
-            controls 
-            className="max-w-xs rounded-lg"
-            preload="metadata"
-          >
-            <source src={media.url} type={media.mimetype} />
-            <span className="text-xs text-slate-400">
-              Seu navegador não suporta o elemento de vídeo.
-            </span>
-          </video>
-        </div>
-      );
-    }
-
-    if (isDocument) {
-      return (
-        <div className="space-y-2">
-          <div className="flex items-center space-x-2 text-slate-300">
-            <FileText className="w-4 h-4" />
-            <span className="text-xs font-medium">Documento</span>
-          </div>
-          <a 
-            href={media.url} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="flex items-center space-x-2 text-blue-400 hover:text-blue-300 transition-colors"
-          >
-            <Download className="w-4 h-4" />
-            <span className="text-sm underline">
-              {media.filename || 'Baixar documento'}
-            </span>
-          </a>
-        </div>
-      );
-    }
-
-    // Fallback para outros tipos de mídia
+    
+    // Outro tipo
     return (
-      <div className="space-y-2">
-        <div className="flex items-center space-x-2 text-slate-300">
-          <FileText className="w-4 h-4" />
-          <span className="text-xs font-medium">Arquivo ({media.mimetype})</span>
+      <a href={url} target="_blank" rel="noopener noreferrer" className="underline">
+        Baixar mídia
+      </a>
+    );
+  }, (prevProps, nextProps) => {
+    // Comparação customizada para evitar re-renderizações desnecessárias
+    return (
+      prevProps.media?.url === nextProps.media?.url &&
+      prevProps.media?.mimetype === nextProps.media?.mimetype &&
+      prevProps.wahaUrl === nextProps.wahaUrl
+    );
+  });
+
+  // Componente de Player de Áudio Customizado (VERSÃO ULTRA SIMPLIFICADA)
+  const AudioPlayer = React.memo(({ url, componentKey, onError }: { url: string, componentKey: string, onError: () => void }) => {
+    const [isPlaying, setIsPlaying] = React.useState(false);
+    const [currentTime, setCurrentTime] = React.useState(0);
+    const [duration, setDuration] = React.useState(0);
+    const [playbackRate, setPlaybackRate] = React.useState(1);
+    const [isLoading, setIsLoading] = React.useState(true);
+    const [hasError, setHasError] = React.useState(false);
+    const audioElementRef = React.useRef<HTMLAudioElement | null>(null);
+    const progressRef = React.useRef<HTMLDivElement>(null);
+
+    // Velocidades de reprodução disponíveis
+    const playbackRates = [0.5, 0.75, 1, 1.25, 1.5, 2];
+
+    // Configurar elemento de áudio de forma mais simples
+    React.useEffect(() => {
+      const audio = new Audio(url);
+      audio.preload = 'metadata';
+      audioElementRef.current = audio;
+      
+      // Timeout para evitar loading infinito
+      const loadingTimeout = setTimeout(() => {
+        if (isLoading) {
+          console.warn(`[AudioPlayer ${componentKey}] Timeout no carregamento - usando fallback`);
+          setIsLoading(false);
+          setDuration(0);
+        }
+      }, 5000); // 5 segundos timeout
+
+      const handleLoadedData = () => {
+        clearTimeout(loadingTimeout);
+        setDuration(audio.duration || 0);
+        setIsLoading(false);
+        setHasError(false);
+        console.log(`[AudioPlayer ${componentKey}] Áudio carregado - Duração: ${audio.duration}s`);
+      };
+
+      const handleTimeUpdate = () => {
+        setCurrentTime(audio.currentTime);
+      };
+      
+      const handlePlay = () => setIsPlaying(true);
+      const handlePause = () => setIsPlaying(false);
+      const handleEnded = () => {
+        setIsPlaying(false);
+        setCurrentTime(0);
+      };
+
+      const handleError = () => {
+        clearTimeout(loadingTimeout);
+        console.error(`[AudioPlayer ${componentKey}] Erro ao carregar áudio: ${url}`);
+        setIsLoading(false);
+        setHasError(true);
+      };
+
+      // Event listeners básicos
+      audio.addEventListener('loadeddata', handleLoadedData);
+      audio.addEventListener('timeupdate', handleTimeUpdate);
+      audio.addEventListener('play', handlePlay);
+      audio.addEventListener('pause', handlePause);
+      audio.addEventListener('ended', handleEnded);
+      audio.addEventListener('error', handleError);
+
+      // Cleanup
+      return () => {
+        clearTimeout(loadingTimeout);
+        audio.removeEventListener('loadeddata', handleLoadedData);
+        audio.removeEventListener('timeupdate', handleTimeUpdate);
+        audio.removeEventListener('play', handlePlay);
+        audio.removeEventListener('pause', handlePause);
+        audio.removeEventListener('ended', handleEnded);
+        audio.removeEventListener('error', handleError);
+        audio.pause();
+        audio.src = '';
+      };
+    }, [url, componentKey, isLoading]);
+
+    const togglePlay = async () => {
+      if (!audioElementRef.current || hasError) return;
+      
+      const audio = audioElementRef.current;
+      
+      try {
+        if (isPlaying) {
+          audio.pause();
+        } else {
+          // Pausar qualquer outro áudio
+          if (audioManagerRef.current.currentAudio && audioManagerRef.current.currentAudio !== audio) {
+            audioManagerRef.current.currentAudio.pause();
+          }
+          
+          audio.playbackRate = playbackRate;
+          await audio.play();
+          
+          audioManagerRef.current.currentAudio = audio;
+          audioManagerRef.current.currentUrl = url;
+          audioManagerRef.current.isPlaying = true;
+        }
+      } catch (error) {
+        console.error(`[AudioPlayer ${componentKey}] Erro ao reproduzir:`, error);
+        setHasError(true);
+      }
+    };
+
+    const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
+      if (audioElementRef.current && progressRef.current && duration > 0 && !hasError) {
+        const rect = progressRef.current.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const width = rect.width;
+        const percentage = clickX / width;
+        const newTime = percentage * duration;
+        
+        audioElementRef.current.currentTime = newTime;
+        setCurrentTime(newTime);
+      }
+    };
+
+    const handlePlaybackRateChange = (rate: number) => {
+      if (audioElementRef.current && !hasError) {
+        audioElementRef.current.playbackRate = rate;
+        setPlaybackRate(rate);
+      }
+    };
+
+    const formatTime = (time: number) => {
+      if (!isFinite(time) || isNaN(time)) return '0:00';
+      const minutes = Math.floor(time / 60);
+      const seconds = Math.floor(time % 60);
+      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    };
+
+    // Se houver erro, mostrar fallback
+    if (hasError) {
+      return (
+        <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-3 max-w-xs">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center text-white">
+              <AlertCircle className="w-4 h-4" />
+            </div>
+            <div className="flex-1">
+              <div className="text-red-400 text-sm">Áudio indisponível</div>
+              <a 
+                href={url} 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-blue-400 text-xs underline hover:text-blue-300"
+              >
+                Tentar baixar
+              </a>
+            </div>
+          </div>
         </div>
-        <a 
-          href={media.url} 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="flex items-center space-x-2 text-blue-400 hover:text-blue-300 transition-colors"
-        >
-          <Download className="w-4 h-4" />
-          <span className="text-sm underline">
-            {media.filename || 'Baixar arquivo'}
-          </span>
-        </a>
+      );
+    }
+
+    return (
+      <div className="bg-slate-700 rounded-lg p-3 max-w-xs">
+        <div className="flex items-center space-x-3">
+          <button 
+            onClick={togglePlay}
+            disabled={isLoading}
+            className="w-10 h-10 bg-green-500 hover:bg-green-600 disabled:bg-slate-500 rounded-full flex items-center justify-center text-white transition-colors"
+          >
+            {isLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : isPlaying ? (
+              <Pause className="w-4 h-4" />
+            ) : (
+              <Play className="w-4 h-4" />
+            )}
+          </button>
+          
+          <div className="flex-1">
+            <div className="flex items-center justify-between text-xs text-slate-300 mb-1">
+              <span>Áudio</span>
+              <span>
+                {isLoading ? (
+                  <span className="text-slate-400">Carregando...</span>
+                ) : (
+                  `${formatTime(currentTime)} / ${formatTime(duration)}`
+                )}
+              </span>
+            </div>
+            
+            <div 
+              ref={progressRef}
+              onClick={handleProgressClick}
+              className="w-full bg-slate-600 rounded-full h-2 cursor-pointer"
+            >
+              <div 
+                className="bg-green-500 h-2 rounded-full transition-all duration-100"
+                style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
+              />
+            </div>
+            
+            <div className="flex items-center space-x-2 mt-2">
+              <span className="text-xs text-slate-400">Velocidade:</span>
+              <select
+                value={playbackRate}
+                onChange={(e) => {
+                  const rate = parseFloat(e.target.value);
+                  handlePlaybackRateChange(rate);
+                }}
+                className="text-xs bg-slate-600 border-slate-500 rounded px-1 py-0.5 text-white"
+              >
+                {playbackRates.map(rate => (
+                  <option key={rate} value={rate}>{rate}x</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
       </div>
     );
-  };
+  }, (prevProps, nextProps) => {
+    return prevProps.url === nextProps.url;
+  });
 
-  // Componente Avatar com foto de perfil
+  // ChatAvatar SIMPLIFICADO - sempre renderiza ícones
   const ChatAvatar = ({ chat, size = 40, className = "" }: { 
     chat: any; 
     size?: number; 
     className?: string; 
   }) => {
-    const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null);
-    const [imageError, setImageError] = useState(false);
+    const chatId = typeof chat?.id === 'object' ? chat.id._serialized : (chat?.id || 'unknown');
+    const hasUnread = (chat?.unreadCount || 0) > 0;
+    const isGroup = chat?.isGroup || false;
+    
+    console.log(`[ChatAvatar] Renderizando:`, { chatId, isGroup, hasUnread, size });
 
-    useEffect(() => {
-      if (!chat.isGroup && sessionStatus?.status === 'WORKING') {
-        // Tentar obter foto de perfil apenas para contatos individuais
-        getContactProfilePicture(chat.id._serialized)
-          .then(url => setProfilePicUrl(url))
-          .catch(() => setProfilePicUrl(null));
-      }
-    }, [chat.id._serialized, chat.isGroup, sessionStatus?.status]);
+    const avatarStyle = {
+      width: `${size}px`,
+      height: `${size}px`,
+      minWidth: `${size}px`,
+      minHeight: `${size}px`
+    };
 
-    const hasUnread = chat.unreadCount > 0;
+    const iconSize = Math.max(12, Math.floor(size * 0.4));
 
-    if (!imageError && profilePicUrl && !chat.isGroup) {
+    if (isGroup) {
       return (
-        <div className={`relative ${className}`}>
-          <img
-            src={profilePicUrl}
-            alt={chat.name}
-            className={`rounded-full object-cover`}
-            style={{ width: size, height: size }}
-            onError={() => {
-              setImageError(true);
-              console.log(`[ChatAvatar] Erro ao carregar imagem para ${chat.name}`);
-            }}
-            onLoad={() => {
-              console.log(`[ChatAvatar] Imagem carregada com sucesso para ${chat.name}`);
-            }}
-          />
-          {/* Badge de contagem no avatar com foto */}
+        <div className={`relative flex-shrink-0 ${className}`} style={avatarStyle}>
+          <div 
+            className="rounded-full flex items-center justify-center bg-green-500 text-white" 
+            style={avatarStyle}
+          >
+            <Users size={iconSize} />
+          </div>
           {hasUnread && (
-            <div className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 rounded-full flex items-center justify-center">
-              <span className="text-white text-xs font-bold">
-                {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
-              </span>
+            <div className="absolute -top-1 -right-1 min-w-[16px] h-[16px] bg-red-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white">
+              {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
             </div>
           )}
         </div>
       );
     }
-
-    // Fallback para ícones quando não há foto ou é grupo
+    
     return (
-      <div className={`relative ${className}`}>
-        {chat.isGroup ? (
-          <div className={`rounded-full flex items-center justify-center ${
-            hasUnread ? 'bg-green-600' : 'bg-green-500'
-          }`} style={{ width: size, height: size }}>
-            <Users className="text-white" size={size * 0.4} />
-          </div>
-        ) : (
-          <div className={`rounded-full flex items-center justify-center ${
-            hasUnread ? 'bg-blue-600' : 'bg-blue-500'
-          }`} style={{ width: size, height: size }}>
-            <User className="text-white" size={size * 0.4} />
-          </div>
-        )}
-        
-        {/* Badge de contagem no avatar com ícone */}
+      <div className={`relative flex-shrink-0 ${className}`} style={avatarStyle}>
+        <div 
+          className="rounded-full flex items-center justify-center bg-blue-500 text-white" 
+          style={avatarStyle}
+        >
+          <User size={iconSize} />
+        </div>
         {hasUnread && (
-          <div className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 rounded-full flex items-center justify-center">
-            <span className="text-white text-xs font-bold">
-              {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
-            </span>
+          <div className="absolute -top-1 -right-1 min-w-[16px] h-[16px] bg-red-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white">
+            {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
           </div>
         )}
       </div>
@@ -1143,13 +1447,13 @@ Posso te ajudar a escolher o curso ideal para seu perfil! 😊`;
       <motion.div variants={item}>
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-4 bg-slate-800 border-slate-700">
-            <TabsTrigger value="connection" className="data-[state=active]:bg-slate-700">
-              <Wifi className="mr-2" size={16} />
-              {isMobile ? 'Conexão' : 'Conexão'}
-            </TabsTrigger>
             <TabsTrigger value="conversations" className="data-[state=active]:bg-slate-700">
               <MessageSquare className="mr-2" size={16} />
               {isMobile ? 'Conversas' : 'Conversas'}
+            </TabsTrigger>
+            <TabsTrigger value="connection" className="data-[state=active]:bg-slate-700">
+              <Wifi className="mr-2" size={16} />
+              {isMobile ? 'Conexão' : 'Conexão'}
             </TabsTrigger>
             <TabsTrigger value="ai-automation" className="data-[state=active]:bg-slate-700">
               <Bot className="mr-2" size={16} />
@@ -1178,7 +1482,7 @@ Posso te ajudar a escolher o curso ideal para seu perfil! 😊`;
                       <Input
                         value={wahaConfig.url}
                         onChange={(e) => setWahaConfig({...wahaConfig, url: e.target.value})}
-                        placeholder="http://localhost:3000"
+                        placeholder="/api/whatsapp"
                         className="bg-slate-800/50 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20"
                       />
                     </div>
@@ -1234,14 +1538,42 @@ Posso te ajudar a escolher o curso ideal para seu perfil! 😊`;
                     <h3 className="text-lg font-semibold text-white">Conexão WhatsApp</h3>
                   </div>
                   
-                  {/* Status da Conexão */}
+                  {/* Status da Conexão MELHORADO */}
                   <div className="mb-6">
-                    <div className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
-                      <div className="flex items-center space-x-2">
-                        <StatusIcon className={status.color.includes('green') ? 'text-green-400' : 
-                                              status.color.includes('yellow') ? 'text-yellow-400' : 
-                                              status.color.includes('blue') ? 'text-blue-400' : 'text-red-400'} size={18} />
-                        <span className="text-white font-medium">{status.text}</span>
+                    <div className="flex items-center justify-between p-4 bg-slate-700/50 rounded-lg border border-slate-600">
+                      <div className="flex items-center space-x-3">
+                        <div className="relative">
+                          <StatusIcon className={status.color.includes('green') ? 'text-green-400' : 
+                                                status.color.includes('yellow') ? 'text-yellow-400' : 
+                                                status.color.includes('blue') ? 'text-blue-400' : 'text-red-400'} size={20} />
+                          {sessionStatus?.status === 'WORKING' && (
+                            <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                          )}
+                          {sessionStatus?.status === 'SCAN_QR_CODE' && (
+                            <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>
+                          )}
+                        </div>
+                        
+                        <div>
+                          <div className="text-white font-medium">{status.text}</div>
+                          {sessionStatus?.me ? (
+                            <div className="text-green-400 text-sm font-medium">
+                              👤 {sessionStatus.me.pushName || sessionStatus.me.user}
+                            </div>
+                          ) : sessionStatus?.status === 'SCAN_QR_CODE' ? (
+                            <div className="text-yellow-400 text-xs animate-pulse">
+                              📱 Escaneie o QR Code com seu WhatsApp
+                            </div>
+                          ) : sessionStatus?.status === 'STARTING' ? (
+                            <div className="text-blue-400 text-xs animate-pulse">
+                              🔄 Iniciando conexão...
+                            </div>
+                          ) : sessionStatus?.status ? (
+                            <div className="text-slate-400 text-xs">
+                              Status: {sessionStatus.status}
+                            </div>
+                          ) : null}
+                        </div>
                       </div>
                       
                       {sessionStatus?.status === 'WORKING' ? (
@@ -1257,16 +1589,16 @@ Posso te ajudar a escolher o curso ideal para seu perfil! 😊`;
                       ) : (
                         <Button
                           onClick={startWhatsAppSession}
-                          disabled={isConnecting}
+                          disabled={isConnecting || sessionStatus?.status === 'STARTING'}
                           className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800"
                           size="sm"
                         >
-                          {isConnecting ? (
+                          {isConnecting || sessionStatus?.status === 'STARTING' ? (
                             <RefreshCw className="mr-1 animate-spin" size={14} />
                           ) : (
                             <PlayCircle className="mr-1" size={14} />
                           )}
-                          {isConnecting ? 'Conectando...' : 'Conectar'}
+                          {isConnecting || sessionStatus?.status === 'STARTING' ? 'Conectando...' : 'Conectar'}
                         </Button>
                       )}
                     </div>
@@ -1469,6 +1801,8 @@ Posso te ajudar a escolher o curso ideal para seu perfil! 😊`;
                             <div
                               key={chat.id._serialized}
                               onClick={() => {
+                                console.log(`[Conversation Click] Chat clicado:`, chat.id._serialized);
+                                console.log(`[Conversation Click] Nome do chat:`, chat.name || chat.id.user);
                                 setSelectedChat(chat.id._serialized);
                                 loadChatMessages(chat.id._serialized);
                                 markChatAsRead(chat.id._serialized);
@@ -1593,61 +1927,72 @@ Posso te ajudar a escolher o curso ideal para seu perfil! 😊`;
                     <div 
                       className="flex-1 overflow-y-auto p-4 space-y-3"
                       style={{ maxHeight: 'calc(600px - 140px)' }}
+                      onScroll={handleScroll}
                     >
                       {chatMessages.length > 0 ? (
-                        chatMessages.map((message, index) => (
-                          <div
-                            key={message.id || index}
-                            className={`flex ${message.fromMe ? 'justify-end' : 'justify-start'}`}
-                          >
+                        <>
+                          {/* Debug: mostrar quantidade de mensagens */}
+                          <div className="text-xs text-slate-400 mb-2">
+                            Mostrando {chatMessages.length} mensagens
+                          </div>
+                          {chatMessages.map((message, index) => (
                             <div
-                              className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                                message.fromMe
-                                  ? 'bg-green-600 text-white rounded-br-none'
-                                  : 'bg-slate-700 text-white rounded-bl-none'
-                              }`}
+                              key={message.id || index}
+                              className={`flex ${message.fromMe ? 'justify-end' : 'justify-start'}`}
                             >
-                              <div className="text-sm">
-                                {/* Texto da mensagem */}
-                                {message.body && (
-                                  <div className="whitespace-pre-wrap mb-2">
-                                    {message.body}
-                                  </div>
-                                )}
-                                
-                                {/* Mídia */}
-                                {message.hasMedia && message.media && (
-                                  <div className="mt-2">
-                                    {renderMediaContent(message.media)}
-                                  </div>
-                                )}
-                                
-                                {/* Fallback para tipos de mensagem não texto sem mídia */}
-                                {!message.body && !message.hasMedia && (
-                                  <div className="flex items-center space-x-2 text-slate-400">
-                                    <FileText className="w-4 h-4" />
-                                    <span className="text-xs">[Mensagem {message.type || 'desconhecida'}]</span>
-                                  </div>
-                                )}
-                              </div>
-                              <div className="flex items-center justify-end space-x-1 mt-1">
-                                <p className="text-xs opacity-70">
-                                  {new Date(message.timestamp * 1000).toLocaleTimeString('pt-BR', {
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                  })}
-                                </p>
-                                {message.fromMe && (
-                                  <div className="text-xs opacity-70">
-                                    {message.ack === 1 && '✓'}
-                                    {message.ack === 2 && '✓✓'}
-                                    {message.ack === 3 && <span className="text-blue-400">✓✓</span>}
-                                  </div>
-                                )}
+                              <div
+                                className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                                  message.fromMe
+                                    ? 'bg-green-600 text-white rounded-br-none'
+                                    : 'bg-slate-700 text-white rounded-bl-none'
+                                }`}
+                              >
+                                <div className="text-sm">
+                                  {/* Texto da mensagem */}
+                                  {message.body && (
+                                    <div className="whitespace-pre-wrap mb-2">
+                                      {message.body}
+                                    </div>
+                                  )}
+                                  
+                                  {/* Mídia */}
+                                  {message.hasMedia && message.media && (
+                                    <div className="mt-2">
+                                      <MediaWithFallback 
+                                        key={`media_${message.id}_${message.media.url.split('/').pop()}`}
+                                        media={message.media} 
+                                        wahaUrl={wahaConfig.url} 
+                                      />
+                                    </div>
+                                  )}
+                                  
+                                  {/* Fallback para tipos de mensagem não texto sem mídia */}
+                                  {!message.body && !message.hasMedia && (
+                                    <div className="flex items-center space-x-2 text-slate-400">
+                                      <FileText className="w-4 h-4" />
+                                      <span className="text-xs">[Mensagem {message.type || 'desconhecida'}]</span>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex items-center justify-end space-x-1 mt-1">
+                                  <p className="text-xs opacity-70">
+                                    {new Date(message.timestamp * 1000).toLocaleTimeString('pt-BR', {
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })}
+                                  </p>
+                                  {message.fromMe && (
+                                    <div className="text-xs opacity-70">
+                                      {message.ack === 1 && '✓'}
+                                      {message.ack === 2 && '✓✓'}
+                                      {message.ack === 3 && <span className="text-blue-400">✓✓</span>}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ))
+                          ))}
+                        </>
                       ) : (
                         <div className="flex-1 flex items-center justify-center">
                           <div className="text-center">

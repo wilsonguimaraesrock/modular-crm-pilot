@@ -40,3 +40,22 @@ secrets.json
 Thumbs.db
 
 /generated/prisma
+
+# Next.js build output
+.next/
+out/
+
+# Next.js cache
+.next/cache/
+
+# Vercel
+.vercel/
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Temporary files and images (QR codes, etc)
+qr-*.png
+*.tmp
+*.temp

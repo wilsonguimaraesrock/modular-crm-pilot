@@ -5,6 +5,7 @@ import { LeadQualification } from '@/components/crm/LeadQualification';
 import { CalendarScheduling } from '@/components/crm/CalendarScheduling';
 import { AttendanceModule } from '@/components/crm/AttendanceModule';
 import { AgendaModule } from '@/components/crm/AgendaModule';
+import { ContactsManager } from '@/components/crm/ContactsManager';
 import { WhatsAppIntegration } from '@/components/crm/WhatsAppIntegration';
 import { AdminPanel } from '@/components/crm/AdminPanel';
 import { Navigation } from '@/components/crm/Navigation';
@@ -33,6 +34,8 @@ const Index = () => {
         return <AttendanceModule />;
       case 'agenda':
         return <AgendaModule />;
+      case 'contacts':
+        return <ContactsManager />;
       case 'whatsapp':
         return <WhatsAppIntegration />;
       case 'admin':

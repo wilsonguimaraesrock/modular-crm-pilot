@@ -648,7 +648,7 @@ export const AgendaModule = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-400 text-sm">Pendentes</p>
-                <p className="text-2xl font-bold text-yellow-400">{taskStats.pendentes}</p>
+                <p className="text-2xl font-bold text-yellow-400">{taskStats.pending}</p>
               </div>
               <Clock className="w-8 h-8 text-yellow-500" />
             </div>
@@ -660,7 +660,7 @@ export const AgendaModule = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-400 text-sm">Atrasadas</p>
-                <p className="text-2xl font-bold text-red-400">{taskStats.atrasadas}</p>
+                <p className="text-2xl font-bold text-red-400">{taskStats.overdue}</p>
               </div>
               <AlertCircle className="w-8 h-8 text-red-500" />
             </div>
@@ -672,7 +672,7 @@ export const AgendaModule = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-400 text-sm">Performance</p>
-                <p className="text-2xl font-bold text-green-400">{taskStats.performance}%</p>
+                <p className="text-2xl font-bold text-green-400">{taskStats.total > 0 ? Math.round((taskStats.completed / taskStats.total) * 100) : 0}%</p>
               </div>
               <TrendingUp className="w-8 h-8 text-green-500" />
             </div>
