@@ -32,7 +32,7 @@ CRM completo para escolas de idiomas com **integração automática** com landin
 // Sistema de integração CORS-safe
 window.enviarParaCRM = function(leadData) {
     const encodedData = encodeURIComponent(JSON.stringify(leadData));
-    const crmUrl = `http://localhost:3001/webhook?leadData=${encodedData}`;
+    const crmUrl = `http://localhost:3002/webhook?leadData=${encodedData}`;
     window.open(crmUrl, '_blank');
 };
 ```
@@ -119,7 +119,7 @@ npm run dev
 #### **URLs de Produção:**
 ```javascript
 // Desenvolvimento
-const crmUrl = `http://localhost:3001/webhook?leadData=${encodedData}`;
+const crmUrl = `http://localhost:3002/webhook?leadData=${encodedData}`;
 
 // Produção
 const crmUrl = `https://crm-rockfeller.com/webhook?leadData=${encodedData}`;
@@ -127,7 +127,7 @@ const crmUrl = `https://crm-rockfeller.com/webhook?leadData=${encodedData}`;
 
 #### **Variáveis de Ambiente:**
 ```bash
-VITE_CRM_WEBHOOK_URL=http://localhost:3001/webhook
+VITE_CRM_WEBHOOK_URL=http://localhost:3002/webhook
 VITE_CRM_PRODUCTION_URL=https://crm-rockfeller.com/webhook
 ```
 
@@ -138,7 +138,7 @@ VITE_CRM_PRODUCTION_URL=https://crm-rockfeller.com/webhook
 🎯 Sistema de integração CRM ativado
 📋 Dados capturados: {...}
 🚀 Processando lead: {...}
-🌐 Abrindo CRM com URL: http://localhost:8080/webhook?leadData=...
+🌐 Abrindo CRM com URL: http://localhost:3002/webhook?leadData=...
 ✅ Lead enviado via URL parameters para CRM
 📨 Lead recebido via URL parameters: {...}
 ✅ Lead cadastrado com sucesso no CRM
